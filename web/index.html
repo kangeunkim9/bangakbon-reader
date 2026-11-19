@@ -57,6 +57,18 @@ button:disabled{opacity:.5;cursor:default}
 .teach .how{color:var(--muted);font-size:.82rem}
 .teach .go{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
 .teach .count{font-size:.8rem;color:var(--muted)}
+.linecard{flex-basis:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.linecard[hidden]{display:none}
+.lchead{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;margin-bottom:8px}
+.lchead span{color:var(--muted);font-size:.82rem}
+.lchead .ghost{margin-left:auto}
+.lcimg{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px}
+.lcimg canvas{display:block;width:100%;height:auto;max-height:120px;object-fit:contain;object-position:left}
+.lines.lc{margin:10px 0 6px;padding:0;list-style:none}
+.lines.lc li{font-size:1.25rem;border-left-color:var(--accent)}
+.lcbtns{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.lcbtns small{opacity:.75;font-weight:400}
+#lcDone{font-size:.82rem;color:var(--ok)}
 .intake{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
 .drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;min-height:84px;background:var(--bg)}
 .drop.over{border-color:var(--accent);background:var(--accent-soft)}
@@ -173,8 +185,20 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <p class="how">원문 표기 그대로, 띄어쓰기 없이, 판본 한 행을 한 줄로 고칩니다. 읽을 수 없는 글자는 <kbd>`</kbd> 키로 □를 넣습니다.</p>
     </div>
     <div class="go">
-      <button class="primary" id="randomPage" type="button">고칠 면 하나 받기</button>
+      <button class="primary" id="lineMode" type="button">틀렸을 법한 행 고치기</button>
+      <button id="randomPage" type="button">한 면 통째로 고치기</button>
       <span class="count" id="teachCount"></span>
+    </div>
+    <div class="linecard" id="linecard" hidden aria-live="polite">
+      <div class="lchead"><b id="lcTitle">행을 가져오는 중…</b><span id="lcInfo"></span><button type="button" id="lcClose" class="ghost">그만하기</button></div>
+      <div class="lcimg"><canvas id="lcCanvas" aria-label="판본 행 사진 (위쪽이 왼쪽으로 오게 눕힘)"></canvas></div>
+      <ol class="lines lc" id="lcList"></ol>
+      <div class="lcbtns">
+        <button class="primary" type="button" id="lcSend">보내고 다음 행 <small>(Enter)</small></button>
+        <button type="button" id="lcSkip">잘 모르겠음, 건너뛰기</button>
+        <span id="lcDone"></span>
+      </div>
+      <p class="how">판독기가 자신 없어 한 행만 골라 보여 드립니다. 사진은 판본 행을 눕힌 것으로, 왼쪽이 행의 위쪽입니다. 맞으면 그대로, 틀린 글자는 고쳐서 보내 주세요. 아래 판본 전체 사진에 지금 행이 표시됩니다.</p>
     </div>
   </section>
 
@@ -910,7 +934,7 @@ function kbdKeydown(e){
       const li=tx.closest('li'), nx=e.key==='ArrowUp'?li.previousElementSibling:li.nextElementSibling; if (nx) focusLine(nx.querySelector('.tx'),ED.pos); return; }
     case 'Home': e.preventDefault(); moveTo(0,e.shiftKey); return;
     case 'End': e.preventDefault(); moveTo(t.length,e.shiftKey); return;
-    case 'Enter': { e.preventDefault(); const nx=tx.closest('li').nextElementSibling; if (nx) focusLine(nx.querySelector('.tx'),0); else imeCommit(); return; }
+    case 'Enter': { e.preventDefault(); if (tx.closest('#linecard')){ imeCommit(); lineSend(); return; } const nx=tx.closest('li').nextElementSibling; if (nx) focusLine(nx.querySelector('.tx'),0); else imeCommit(); return; }
     case 'Escape': e.preventDefault(); $('kbd').blur(); return;
     case 'Tab': imeCommit(); return;
   }
@@ -1127,7 +1151,7 @@ function pickTarget(){
   const [t,n]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)]; return [t,n,0];
 }
 $('randomPage').onclick=async()=>{
-  if (state.running) return; if (!COUNTS) await loadCounts();
+  if (state.running) return; LM.on=false; $('linecard').hidden=true; if (!COUNTS) await loadCounts();
   for (let tries=0; tries<3; tries++){
     const [t,n,p]=pickTarget(); await openCommons(t,n,p);
     const P=state.pages[0], conf=P&&P.conf&&P.conf.length ? P.conf.reduce((a,b)=>a+b,0)/P.conf.length : 0;
@@ -1135,6 +1159,52 @@ $('randomPage').onclick=async()=>{
     if (tries<2) setMsg('판독이 잘 안 되는 면이 걸려서 다른 면을 가져옵니다…');
   }
 };
+// ---------- 틀렸을 법한 행 고치기 (한 행씩) ----------
+const LM={on:false, queue:[], k:-1, done:0, img:null, busy:false};
+async function lineNextPage(){
+  $('lcTitle').textContent='면을 가져오는 중…'; $('lcInfo').textContent=''; $('lcList').innerHTML=''; const cv=$('lcCanvas'); cv.width=cv.height=0;
+  if (!COUNTS) await loadCounts();
+  for (let tries=0; tries<4 && LM.on; tries++){
+    const [t,n]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)]; await openCommons(t,n,0);
+    const P=state.pages[0], conf=P&&P.conf&&P.conf.length ? P.conf.reduce((a,b)=>a+b,0)/P.conf.length : 0;
+    if (!(P && P.status==='ok' && P.lines.length>=8 && conf>=CFG.minConf)) continue;
+    // 판독기가 가장 자신 없어 한 행부터 (짧은 행은 빼고). 확신이 높은 행이 하나쯤 섞이게 해서 판독기 자기 평가도 점검
+    const ks=P.lines.map((l,k)=>[P.conf[k],k]).filter(x=>P.lines[x[1]].text.length>=4).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+    LM.queue=ks.slice(0,3); if (ks.length>6 && Math.random()<0.3) LM.queue.push(ks[ks.length-1-Math.floor(Math.random()*3)]);
+    LM.img=await createImageBitmap(P.full); return lineShow();
+  }
+  if (LM.on) $('lcTitle').textContent='알맞은 면을 찾지 못했습니다. 다시 눌러 주세요.';
+}
+function lineShow(){
+  if (!LM.on) return; if (!LM.queue.length) return lineNextPage();
+  const P=state.pages[0], k=LM.queue.shift(); LM.k=k; const [a,c]=P.cols[k], w=c-a+6, h=P.bt-P.t;
+  const cv=$('lcCanvas'), x=cv.getContext('2d'); cv.width=h; cv.height=w;
+  x.save(); x.translate(0,w); x.rotate(-Math.PI/2); x.drawImage(LM.img, Math.max(0,a-3), P.t, w, h, 0, 0, w, h); x.restore();
+  $('lcTitle').textContent=`${state.name} ${P.no}쪽 · ${k+1}행`;
+  $('lcInfo').textContent=` 판독기 확신 ${Math.round((P.conf[k]||0)*100)}%`;
+  const ol=$('lcList'); ol.innerHTML=''; const li=document.createElement('li'); li.dataset.k=k;
+  const no=document.createElement('span'); no.className='no'; no.textContent=k+1; const tx=document.createElement('span'); tx.className='tx'; tx.spellcheck=false; tx.textContent=P.lines[k].text; tx.setAttribute('aria-label',(k+1)+'행 판독문');
+  li.append(no,tx); ol.appendChild(li); bindLine(tx);
+  select(k,true); setTimeout(()=>{ if (IME.on) focusLine(tx, P.lines[k].text.length); else tx.focus(); $('linecard').scrollIntoView({block:'nearest'}); },50);
+}
+async function lineSend(){
+  if (LM.busy || LM.k<0) return; const P=state.pages[0], k=LM.k, L=P.lines[k]; imeCommit(); LM.busy=true; $('lcSend').disabled=true;
+  try {
+    const [a,c]=P.cols[k], w=c-a+6, h=P.bt-P.t, cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    cv.getContext('2d').drawImage(LM.img, Math.max(0,a-3), P.t, w, h, 0, 0, w, h);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.92));
+    const doc={kind:'line', src:state.name, commons:state.commons||'', page:P.no, line_no:k+1, col:[a,c], t:P.t, bt:P.bt, W:P.W, H:P.H,
+      lines:[{orig:L.orig, text:L.text}], conf:P.conf[k], model:CFG.modelLabel, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
+    const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(Object.assign({image:await b64(blob)},doc))});
+    const j=await r.json(); if (!j.ok) throw new Error(j.error);
+    LM.done++; $('lcDone').textContent=`이번에 보낸 행 ${LM.done}개 · 고맙습니다`; renderCurrent(); lineShow(); loadCounts();
+  } catch(e){ $('lcDone').textContent='보내지 못했습니다. 잠시 뒤 다시 눌러 주세요.'; }
+  finally { LM.busy=false; $('lcSend').disabled=false; }
+}
+$('lineMode').onclick=()=>{ if (state.running) return; LM.on=true; $('linecard').hidden=false; lineNextPage(); };
+$('lcSend').onclick=lineSend;
+$('lcSkip').onclick=()=>{ imeCommit(); lineShow(); };
+$('lcClose').onclick=()=>{ LM.on=false; LM.queue=[]; $('linecard').hidden=true; };
 if (CFG.github && CFG.inbox) loadCounts();
 if (CFG.github && CFG.inbox) $('teach').hidden=false;
 // 주소로 특정 면 열기: ?f=File:...pdf&p=쪽&n=이름

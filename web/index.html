@@ -415,7 +415,9 @@ KP.segment = function(im){
   const x0=ink[0], x1=ink[ink.length-1];
   let mean=0; for (let i=x0;i<x1;i++) mean+=prof[i]; mean/=(x1-x0);
   const p=[]; for (let i=x0;i<x1;i++) p.push(prof[i]-mean);
-  const vals=[]; for (let lag=45; lag<150 && lag<p.length; lag++){ let s=0; for (let i=0;i+lag<p.length;i++) s+=p[i]*p[i+lag]; vals.push(s); }
+  // 행 간격은 45px부터 이미지 너비의 1/3까지 찾는다(완판처럼 글자가 큰 판본, 해상도가 높은 사진)
+  const LMAX=Math.max(150, Math.floor(W/3));
+  const vals=[]; for (let lag=45; lag<LMAX && lag<p.length; lag++){ let s=0; for (let i=0;i+lag<p.length;i++) s+=p[i]*p[i+lag]; vals.push(s); }
   if (!vals.length) return {t, bt, cols:[]};
   let vmax=-Infinity, vam=0; vals.forEach((v,i)=>{ if (v>vmax){ vmax=v; vam=i; } });
   let pk = findPeaks(vals).filter(k=>vals[k]>0.5*vmax); if (!pk.length) pk=[vam];
@@ -570,6 +572,11 @@ KP.beam = function(lp, T, C, chars, LM, alpha=0.3, beta=1.0, Bw=10){
 KP.graphemes = function(s){
   try { return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(s)].length; } catch(e){ return s.length; }
 };
+// 면 사진 너비를 학습 때(위키미디어 공용 스캔, 약 1500px)와 비슷하게 맞춘다
+KP.normWidth = function(im){
+  if (im.w>1700 || im.w<1000){ const ow=1500, oh=Math.max(1,Math.round(im.h*ow/im.w)); return resizeBilinear(im, ow, oh); }
+  return im;
+};
 KP.H=H; KP.MAXW=MAXW;
 window.KP = KP;
 })();
@@ -685,7 +692,8 @@ async function run(){
     const eng = await loadEngine(useLM);
     state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
     const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
-    for await (const [no,g] of pagesOf(state.file,a,b)){
+    for await (let [no,g] of pagesOf(state.file,a,b)){
+      g = KP.normWidth(g);
       if (state.stop) break;
       setMsg(`${no}쪽 행 나누는 중…`); await idle();
       let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }

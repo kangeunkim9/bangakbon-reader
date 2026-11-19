@@ -403,7 +403,8 @@ async function run(){
     const eng = await loadEngine(useLM);
     state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
     const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
-    for await (const [no,g] of pagesOf(state.file,a,b)){
+    for await (let [no,g] of pagesOf(state.file,a,b)){
+      g = KP.normWidth(g);
       if (state.stop) break;
       setMsg(`${no}쪽 행 나누는 중…`); await idle();
       let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }

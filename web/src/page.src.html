@@ -820,7 +820,7 @@ async function openCommons(title,name,want){
   } catch(e){ setMsg('면을 가져오지 못했습니다. 잠시 뒤 다시 눌러 주세요.', true); }
   finally { btn.disabled=false; }
 }
-const GH_TITLE='File:CNTS-00109637790 금향졍긔 이종. 권하.pdf', GH_TEST=[34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,66];
+const GH_TITLE='File:CNTS-00109637790 금향졍긔 이종. 권하.pdf', GH_TEST=[33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,65];
 let COUNTS=null;
 async function loadCounts(){
   try { const j=await (await fetch(CFG.inbox)).json(); COUNTS=j.counts||{}; $('teachCount').textContent = j.total ? `지금까지 모인 면 ${j.total}면` : '아직 모인 면이 없습니다. 첫 면을 고쳐 주세요.'; }

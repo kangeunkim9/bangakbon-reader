@@ -47,5 +47,5 @@ body:
     attributes:
       label: 확인
       options:
-        - label: 공개된 자료이거나 이용 허락을 받은 자료이며, 판독기 학습과 연구에 쓰는 데 동의합니다.
+        - label: 판독기 학습과 연구에 쓰는 데 동의합니다.
           required: true

@@ -187,7 +187,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <div>
       <h2>판독기를 함께 가르쳐 주세요</h2>
       <p>단추를 누르면 위키미디어 공용에 공개된 국립중앙도서관 소장 방각본 가운데 한 면을 골라 판독기가 읽어 둡니다. 틀린 글자를 고친 뒤 <b>학습용으로 보내기</b>를 눌러 주세요. 사람이 고친 면이 모일수록 판독기가 정확해집니다.</p>
-      <p class="how">원문 표기 그대로, 띄어쓰기 없이, 판본 한 행을 한 줄로 고칩니다. 읽을 수 없는 글자는 <kbd>`</kbd> 키로 □를 넣습니다.</p>
+      <p class="how">원문 표기 그대로, 띄어쓰기 없이, 판본 한 행을 한 줄로 고칩니다. 읽을 수 없는 글자는 <kbd>`</kbd> 키로 □를, 반복 부호는 풀어 쓰지 말고 <kbd>Shift</kbd>+<kbd>'</kbd> 키로 〃를 넣습니다.</p>
     </div>
     <div class="go">
       <button class="primary" id="randomPage" type="button">고칠 면 하나 받기</button>
@@ -233,14 +233,14 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
         <button id="copyPage">이 면 복사</button>
       </div>
       <div class="trainbar" id="trainbar" hidden>
-        <p id="trainHint">모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.</p>
+        <p id="trainHint">모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □, 반복 부호는 〃로 적어 주세요.</p>
         <input id="trainBy" class="ghonly-in" hidden placeholder="이름 (선택)" aria-label="보내는 사람 이름, 선택" maxlength="40">
         <button class="primary" id="sendTrain">검수 끝, 학습용으로 보내기</button>
         <p class="trainnote" id="trainNote" hidden>보낸 면 사진과 판독문은 판독기 학습과 연구에 쓰입니다. 이름을 적으면 <a href="contributors.html" target="_blank" rel="noopener">함께 고친 사람들</a>에 보낸 면 수와 함께 올라갑니다.</p>
       </div>
       <div class="oldk" id="oldk" hidden aria-label="옛한글 입력">
         <label class="imesw"><input type="checkbox" id="imeOn" checked> 옛한글 자판</label>
-        <p class="help" id="imeHelp">평소 두벌식대로 치면 됩니다. <span class="kk"><kbd>ㅏ</kbd><kbd>ㅏ</kbd> ᆞ</span> <span class="kk"><kbd>⇧ㅁ</kbd> ㅿ</span> <span class="kk"><kbd>⇧ㅇ</kbd> ㆁ</span> <span class="kk"><kbd>⇧ㅎ</kbd> ㆆ</span> <span class="kk"><kbd>ㅅ</kbd><kbd>ㄱ</kbd> ㅺ</span> <span class="kk"><kbd>`</kbd> □ 못 읽는 글자</span></p>
+        <p class="help" id="imeHelp">평소 두벌식대로 치면 됩니다. <span class="kk"><kbd>ㅏ</kbd><kbd>ㅏ</kbd> ᆞ</span> <span class="kk"><kbd>⇧ㅁ</kbd> ㅿ</span> <span class="kk"><kbd>⇧ㅇ</kbd> ㆁ</span> <span class="kk"><kbd>⇧ㅎ</kbd> ㆆ</span> <span class="kk"><kbd>ㅅ</kbd><kbd>ㄱ</kbd> ㅺ</span> <span class="kk"><kbd>`</kbd> □ 못 읽는 글자</span> <span class="kk"><kbd>⇧'</kbd> 〃 반복 부호</span></p>
       </div>
       <input type="password" id="kbd" class="kbd" autocomplete="off" data-lpignore="true" data-1p-ignore aria-label="판독문 입력" tabindex="-1">
       <div id="textBody"></div>
@@ -935,6 +935,7 @@ function kbdKeydown(e){
     case 'Tab': imeCommit(); return;
   }
   if (e.key==='`'){ e.preventDefault(); insertText('□'); return; }
+  if (e.key==='"'){ e.preventDefault(); insertText('〃'); return; }   // 반복 부호 (Shift+')
   if (e.key.length===1){ e.preventDefault(); insertText(e.key); return; }
 }
 function imeToggle(on){
@@ -1009,7 +1010,7 @@ function renderTrain(){
     const d=sentDoc(P), n=P.lines.filter(l=>l.text!==l.orig).length;
     $('sendTrain').textContent = d ? '고친 내용으로 다시 보내기' : '검수 끝, 학습용으로 보내기';
     $('trainHint').innerHTML = d ? `<span class="done">학습용으로 보냈습니다</span> (${new Date(d.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}, 고친 행 ${d.lines.filter(l=>l.text!==l.orig).length}개). 더 고쳤다면 다시 보내 주세요.`
-      : `모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.${n?` 지금 고친 행 ${n}개.`:''}`;
+      : `모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □, 반복 부호는 〃로 적어 주세요.${n?` 지금 고친 행 ${n}개.`:''}`;
   }
   if (DB || CFG.inbox){ let pages=0, lines=0; for (const d of SENT.values()){ pages++; lines+=(d.lines||[]).length; } $('trainCount').textContent = pages ? `${DB?'학습용으로 모은 면':'이번에 보낸 면'} ${pages}면, 행 ${lines}개` : ''; }
 }

@@ -148,6 +148,7 @@ function kbdKeydown(e){
     case 'Tab': imeCommit(); return;
   }
   if (e.key==='`'){ e.preventDefault(); insertText('□'); return; }
+  if (e.key==='"'){ e.preventDefault(); insertText('〃'); return; }   // 반복 부호 (Shift+')
   if (e.key.length===1){ e.preventDefault(); insertText(e.key); return; }
 }
 function imeToggle(on){

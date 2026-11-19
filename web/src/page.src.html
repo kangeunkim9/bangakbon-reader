@@ -64,13 +64,12 @@ button:disabled{opacity:.5;cursor:default}
 .lchead .ghost{margin-left:auto}
 .lcbody{display:flex;gap:20px;align-items:flex-start;margin:4px 0 10px;overflow-x:auto}
 .lcimg{flex:none;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px}
-.lcimg canvas{display:block;height:min(62vh,900px);width:auto}
+.lcimg canvas{display:block;width:auto}
 .lcv{flex:none}
-.lines.lc{margin:0;padding:0;list-style:none;writing-mode:vertical-rl;height:min(62vh,900px)}
-.lines.lc li{display:block;padding:4px 6px;border:0;border-top:3px solid var(--accent);background:var(--accent-soft)}
+.lines.lc{margin:0;padding:0;list-style:none}
+.lines.lc li{display:block;padding:4px 8px;border:0;border-top:3px solid var(--accent);background:var(--accent-soft)}
 .lines.lc li .no{display:none}
-.lines.lc .tx{line-height:1.15}
-.lines.lc .tx .caret{width:1.1em;height:0;border-left:0;border-top:2px solid var(--accent);margin:0 0 -2px 0;vertical-align:0}
+.lines.lc .tx{display:block;width:1.3em;word-break:break-all;overflow-wrap:anywhere;white-space:pre-wrap;text-align:center}
 .lcbtns{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
 .lcbtns small{opacity:.75;font-weight:400}
 #lcDone{font-size:.82rem;color:var(--ok)}
@@ -205,7 +204,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
         <button type="button" id="lcSkip">잘 모르겠음, 건너뛰기</button>
         <span id="lcDone"></span>
       </div>
-      <p class="how">판독기가 자신 없어 한 행만 골라 보여 드립니다. 왼쪽이 판본 행 사진, 오른쪽이 판독문입니다. 맞으면 그대로, 틀린 글자는 고쳐서 보내 주세요. 위아래 방향키로 글자 사이를 옮겨 다닙니다. 아래 판본 전체 사진에 지금 행이 표시됩니다.</p>
+      <p class="how">판독기가 자신 없어 한 행만 골라 보여 드립니다. 왼쪽이 판본 행 사진, 오른쪽이 판독문이고 글자 높이를 맞춰 두었습니다. 맞으면 그대로, 틀린 글자는 고쳐서 보내 주세요. 위아래 방향키로 글자 사이를 옮겨 다닙니다. 아래 판본 전체 사진에 지금 행이 표시됩니다.</p>
     </div>
   </section>
 
@@ -658,7 +657,7 @@ function kbdKeydown(e){
       if (!e.shiftKey && ED.pos!==ED.anc){ moveTo(e.key==='ArrowLeft'?Math.min(ED.pos,ED.anc):Math.max(ED.pos,ED.anc)); return; }
       moveTo(stepG(t,ED.pos,e.key==='ArrowLeft'?-1:1), e.shiftKey); return; }
     case 'ArrowUp': case 'ArrowDown': {
-      e.preventDefault(); const vert=getComputedStyle(tx).writingMode.startsWith('vertical');
+      e.preventDefault(); const vert=getComputedStyle(tx).writingMode.startsWith('vertical') || !!tx.closest('#linecard');
       if (vert){ moveTo(stepG(t,ED.pos,e.key==='ArrowUp'?-1:1), e.shiftKey); return; }
       const li=tx.closest('li'), nx=e.key==='ArrowUp'?li.previousElementSibling:li.nextElementSibling; if (nx) focusLine(nx.querySelector('.tx'),ED.pos); return; }
     case 'Home': e.preventDefault(); moveTo(0,e.shiftKey); return;
@@ -910,7 +909,9 @@ function lineShow(){
   const P=state.pages[0], k=LM.queue.shift(); LM.k=k; const [a,c]=P.cols[k], w=c-a+6, h=P.bt-P.t;
   const cv=$('lcCanvas'), x=cv.getContext('2d'); cv.width=w; cv.height=h;
   x.drawImage(LM.img, Math.max(0,a-3), P.t, w, h, 0, 0, w, h);
-  $('lcList').style.fontSize=Math.max(18,Math.min(40, Math.round(Math.min(h, innerHeight*0.62)/Math.max(8,KP.graphemes(P.lines[k].text).length)*0.82)))+'px';
+  // 세로로 쓰면 옛한글 자모가 풀려 보여서, 글자를 한 줄에 하나씩 가로로 쓰고 세로로 쌓는다. 사진과 판독문 글자 간격을 맞춘다
+  const n=Math.max(6,KP.graphemes(P.lines[k].text).length), dispH=Math.round(Math.min(h*0.5, innerHeight*0.85)), step=dispH/n;
+  cv.style.height=dispH+'px'; const ls=$('lcList'); ls.style.fontSize=Math.max(14,Math.min(40,Math.round(step*0.78)))+'px'; ls.style.lineHeight=step.toFixed(1)+'px';
   $('lcTitle').textContent=`${state.name} ${P.no}쪽 · ${k+1}행`;
   $('lcInfo').textContent=` 판독기 확신 ${Math.round((P.conf[k]||0)*100)}%`;
   const ol=$('lcList'); ol.innerHTML=''; const li=document.createElement('li'); li.dataset.k=k;

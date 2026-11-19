@@ -111,10 +111,22 @@ class Reader:
         return res
 
 def newest_model():
+    """드라이브에 학습한 모델(.pt)이 있으면 그것, 없으면 판독기에 올린 공개 모델(ONNX)을 GitHub에서 받는다."""
     for v in (9, 8, 7):
         p = f'{ROOT}/gyeongpan_model_v{v}.pt'
         if os.path.exists(p): return p
-    raise SystemExit('드라이브에서 판독 모델(gyeongpan_model_v*.pt)을 찾지 못했습니다.')
+    html = requests.get(REPO + 'web/index.html', timeout=60).text
+    m = re.search(r"model: \[([^\]]+)\]", html); cs = re.search(r"charset: '([^']+)'", html)
+    parts = re.findall(r"'([^']+\.wasm)'", m.group(1)); os.makedirs('/content/bangakbon_model', exist_ok=True)
+    dst = '/content/bangakbon_model/' + parts[0].rsplit('_', 1)[0] + '.onnx'
+    if not os.path.exists(dst):
+        print('드라이브에 학습 모델이 없어 판독기의 공개 모델을 받습니다:', ', '.join(parts))
+        data = b''.join(requests.get(REPO + 'web/' + p, timeout=300).content for p in parts); open(dst, 'wb').write(data)
+    cpath = '/content/bangakbon_model/' + cs.group(1)
+    open(cpath, 'wb').write(requests.get(REPO + 'web/' + cs.group(1), timeout=60).content)
+    os.environ['BANGAKBON_CHARSET'] = cpath
+    subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'onnxruntime'], check=False)
+    return dst
 
 # ---------- 한 면 / 한 책 ----------
 def read_face(R, im, no, side, split, srcW, srcH):

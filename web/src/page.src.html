@@ -201,11 +201,11 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 
   <section class="intake" aria-label="판독할 자료">
     <label class="drop" id="drop" for="file">
-      <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp">
+      <input type="file" id="file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.json,application/json">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="7" y="3" width="20" height="28" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 9v16M17 9v16M22 9v16" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 2.5"/></svg>
       <span>
         <span class="big">PDF나 면 사진을 여기에 놓거나 눌러서 고르세요</span><br>
-        <span class="sub">위키미디어 공용·국립중앙도서관 원문 PDF, JPG, PNG</span><br>
+        <span class="sub">위키미디어 공용·국립중앙도서관 원문 PDF, JPG, PNG · Colab 판독 결과(.json)는 PDF와 같이 넣으세요</span><br>
         <span class="file" id="fname"></span>
       </span>
     </label>
@@ -434,12 +434,20 @@ async function run(){
   state.running=true; state.stop=false; $('go').disabled=true; $('stop').hidden=false;
   const prevPages = state.pages, prevName = state.name;
   try {
-    const eng = await loadEngine(useLM);
+    let eng = state.imp ? null : await loadEngine(useLM);   // 미리 판독한 결과만 띄울 때는 엔진을 받지 않는다
     state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
     const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
-    for await (let [no,g,side] of halves(pagesOf(state.file,a,b))){
+    for await (let [no,g,side,iq] of halves(pagesOf(state.file,a,b))){
       g = KP.normWidth(g); const lab = no+'쪽'+(side?' '+side:'');
       if (state.stop) break;
+      if (iq){   // Colab에서 미리 판독한 결과가 있으면 다시 읽지 않는다
+        const sc=g.w/(iq.W||g.w);
+        const P = {no: state.file.srcPage||no, side, W:g.w, H:g.h, t:Math.round(iq.t*sc), bt:Math.round(iq.bt*sc), cols:(iq.cols||[]).map(([x0,x1])=>[Math.round(x0*sc),Math.round(x1*sc)]),
+          lines:(iq.lines||[]).map(t=>({text:t, orig:t})), conf:iq.conf||[], status:iq.status||'ok', url: await previewURL(g), full: await fullJPEG(g)};
+        state.pages.push(P); if (state.pages.length===1) state.cur=0;
+        done++; setMsg(`${lab} 불러옴 (Colab 판독 결과)`); setBar(done/(state.total||1)); renderPages(); if (state.cur===state.pages.length-1) renderCurrent(); await idle(); continue;
+      }
+      if (!eng) eng = await loadEngine(useLM);
       setMsg(`${lab} 행 나누는 중…`); await idle();
       let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }
       const P = {no: state.file.srcPage||no, side, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
@@ -486,7 +494,14 @@ async function run(){
 }
 const idle = ()=>new Promise(r=>setTimeout(r,0));
 // 두 면이 나란히 찍힌 사진은 오른쪽 면부터 따로 읽는다
-async function* halves(gen){ for await (const [no,g] of gen){ const parts=KP.splitSpread(g); if (parts.length<2) yield [no,g,'']; else { yield [no,parts[0],'오른쪽']; yield [no,parts[1],'왼쪽']; } } }
+async function* halves(gen){ for await (const [no,g] of gen){
+  const ip = state.imp ? state.imp.pages.filter(q=>q.no===no) : [];
+  if (ip.length){   // 미리 판독한 결과: 그때 나눈 자리 그대로 자른다
+    const sc = g.w/(ip[0].srcW||g.w);
+    for (const q of ip){ yield [no, q.split ? cropX(g, Math.round(q.split[0]*sc), Math.round(q.split[1]*sc)) : g, q.side||'', q]; }
+    continue; }
+  const parts=KP.splitSpread(g); if (parts.length<2) yield [no,g,'']; else { yield [no,parts[0],'오른쪽']; yield [no,parts[1],'왼쪽']; } } }
+function cropX(g,x0,x1){ x0=Math.max(0,x0); x1=Math.min(g.w,x1); const w=x1-x0, d=new Uint8Array(w*g.h); for (let y=0;y<g.h;y++) d.set(g.d.subarray(y*g.w+x0, y*g.w+x1), y*w); return {w, h:g.h, d}; }
 function plab(P){ return P.no+'쪽'+(P.side?' '+P.side:''); }
 function fmtTime(s){ s=Math.max(1,Math.round(s)); return s<60 ? s+'초' : Math.floor(s/60)+'분 '+(s%60)+'초'; }
 function setMsg(t,err){ const m=$('msg'); m.textContent=t; m.classList.toggle('err',!!err); }
@@ -868,12 +883,25 @@ $('saveAll').onclick=async()=>{
 (async()=>{ try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch(e){ downloads=null; } $('saveAll').hidden=!(downloads||CFG.github); })();
 
 // ---------- 조작 ----------
-function pick(f){ if (!f) return; if (!f.srcPage) state.commons=''; state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
-$('file').addEventListener('change',e=>pick(e.target.files[0]));
+async function pickFiles(fs){
+  fs=[...(fs||[])]; const js=fs.find(f=>/\.json$/i.test(f.name)), doc=fs.find(f=>!/\.json$/i.test(f.name));
+  if (js){
+    try { const d=JSON.parse(await js.text()); if (!d || d.format!=='bangakbon-ocr' || !Array.isArray(d.pages)) throw 0; state.imp=d; }
+    catch(e){ state.imp=null; setMsg('판독 결과 파일을 읽지 못했습니다. Colab 대량 판독에서 만든 .json인지 확인해 주세요.', true); return; }
+  } else if (doc) state.imp=null;
+  if (doc) pick(doc);
+  if (state.imp){
+    const n=state.imp.pages.length; $('fname').textContent=(state.file?state.file.name+' · ':'')+`판독 결과 ${n}면 (${state.imp.model||''})`;
+    setMsg(state.file ? `판독 결과 ${n}면을 불러왔습니다. 판독 시작을 누르면 다시 읽지 않고 바로 띄웁니다. 결과에 없는 쪽은 새로 읽습니다.` : '판독 결과를 불러왔습니다. 같은 PDF도 함께 넣어 주세요.');
+    if (state.imp.src && state.file && !state.file.name.replace(/\.pdf$/i,'').includes(String(state.imp.src).replace(/\.pdf$/i,'').slice(-12))) setMsg(`결과 파일은 「${state.imp.src}」의 것입니다. 넣은 PDF가 같은 책인지 확인해 주세요.`, true);
+  }
+}
+function pick(f){ if (!f) return; if (!f.srcPage) state.commons=''; else state.imp=null; state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
+$('file').addEventListener('change',e=>pickFiles(e.target.files));
 const drop=$('drop');
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
-drop.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));
+drop.addEventListener('drop',e=>pickFiles(e.dataTransfer.files));
 $('go').onclick=run;
 // ---------- 아무 면이나 읽고 고치기 (위키미디어 공용의 국립중앙도서관 소장 방각본) ----------
 const EXAMPLES=[

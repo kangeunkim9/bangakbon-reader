@@ -127,6 +127,12 @@ button:disabled{opacity:.5;cursor:default}
 .tx .caret.comp{animation:none}
 @keyframes blink{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.tx .caret{animation:none}}
+.linetools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-start;padding:10px 14px 14px;border-top:1px dashed var(--line)}
+.linetools .note{flex:1 1 280px;display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
+.linetools textarea{font:inherit;font-size:.88rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;resize:vertical;min-height:2.6em}
+.lines li.added .no{color:var(--accent)}
+.lines li .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:0 4px;grid-column:3}
+.lines li.added{grid-template-columns:2.4em minmax(0,1fr) auto}
 .oldk .imesw{display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:600;margin-right:6px}
 .oldk .imesw input{width:18px;height:18px;accent-color:var(--accent)}
 .oldk .help kbd{font-family:var(--f-mono);border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--bg)}
@@ -459,6 +465,13 @@ function renderCurrent(partial){
   const ol=document.createElement('ol'); ol.className='lines'; ol.setAttribute('aria-label','판독문, 오른쪽 행부터');
   P.lines.forEach((_,k)=>ol.appendChild(lineItem(P,k)));
   wrap.appendChild(ol); body.appendChild(wrap);
+  const tools=document.createElement('div'); tools.className='linetools';
+  const add=document.createElement('button'); add.type='button'; add.textContent='+ 빠진 행 넣기'; add.title='판독기가 놓친 행을 맨 끝(가장 왼쪽 행)에 넣습니다';
+  add.onclick=()=>{ P.lines.push({text:'',orig:'',added:true}); renderCurrent(); const li=body.querySelector(`.lines li[data-k="${P.lines.length-1}"] .tx`); if (li){ if (IME.on) focusLine(li,0); else li.focus(); } renderEditInfo(); };
+  const lab=document.createElement('label'); lab.className='note'; lab.innerHTML='<span>비고</span>';
+  const ta=document.createElement('textarea'); ta.rows=2; ta.placeholder='행 나누기가 틀린 곳, 빠진 행의 위치, 훼손·판독 불가 등 남길 말'; ta.value=P.note||'';
+  ta.addEventListener('input',()=>{ P.note=ta.value; }); lab.appendChild(ta);
+  tools.append(add,lab); body.appendChild(tools);
   if (active>=0) select(active,false);
 }
 function lineItem(P,k){
@@ -468,6 +481,8 @@ function lineItem(P,k){
   tx.setAttribute('aria-label',(k+1)+'행');
   li.append(no,tx); bindLine(tx);
   no.addEventListener('click',()=>select(k,true));
+  if (L.added){ li.classList.add('added'); no.title='직접 넣은 행'; const del=document.createElement('button'); del.type='button'; del.className='del'; del.textContent='✕'; del.setAttribute('aria-label',(k+1)+'행 빼기');
+    del.onclick=()=>{ P.lines.splice(k,1); renderCurrent(); renderEditInfo(); }; li.appendChild(del); }
   return li;
 }
 // ---------- 옛한글 자판 (두벌식 + 옛글자 규칙) ----------
@@ -476,7 +491,6 @@ function lineItem(P,k){
 const IME={on:true, comp:null, tx:null, pos0:0, len:0, hist:[]};
 const ED={tx:null, pos:0, anc:0, drag:false, undo:new Map()};
 const COARSE = matchMedia('(pointer:coarse)').matches && !matchMedia('(any-pointer:fine)').matches;
-try { const v=localStorage.getItem('oldIME'); if (v!==null) IME.on=v==='1'; } catch(e){}
 if (COARSE) IME.on=false;   // 화면 자판만 있는 기기에서는 기기 자판을 그대로 쓴다
 const KM={KeyQ:['ㅂ','ㅃ'],KeyW:['ㅈ','ㅉ'],KeyE:['ㄷ','ㄸ'],KeyR:['ㄱ','ㄲ'],KeyT:['ㅅ','ㅆ'],KeyY:['ㅛ','ㅛ'],KeyU:['ㅕ','ㅕ'],KeyI:['ㅑ','ㅑ'],KeyO:['ㅐ','ㅒ'],KeyP:['ㅔ','ㅖ'],
   KeyA:['ㅁ','ㅿ'],KeyS:['ㄴ','ㄴ'],KeyD:['ㅇ','ㆁ'],KeyF:['ㄹ','ㄹ'],KeyG:['ㅎ','ㆆ'],KeyH:['ㅗ','ㅗ'],KeyJ:['ㅓ','ㅓ'],KeyK:['ㅏ','ㆍ'],KeyL:['ㅣ','ㅣ'],
@@ -699,14 +713,14 @@ function renderTrain(){
   if (DB || CFG.inbox){ let pages=0, lines=0; for (const d of SENT.values()){ pages++; lines+=(d.lines||[]).length; } $('trainCount').textContent = pages ? `${DB?'학습용으로 모은 면':'이번에 보낸 면'} ${pages}면, 행 ${lines}개` : ''; }
 }
 function b64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
-function trainLines(P){ return P.lines.map(l=>({orig:l.orig,text:l.text})); }
+function trainLines(P){ return P.lines.map(l=>l.added?{orig:'',text:l.text,added:true}:{orig:l.orig,text:l.text}); }
 try { $('trainBy').value = localStorage.getItem('trainBy')||''; } catch(e){}
 $('trainBy').addEventListener('change',()=>{ try { localStorage.setItem('trainBy',$('trainBy').value.trim()); } catch(e){} });
 async function sendInbox(P){
   const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
   try {
     const doc={src:state.name, commons:state.commons||'', page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
-      lines:trainLines(P), model:CFG.modelLabel, lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
+      lines:trainLines(P), note:(P.note||'').slice(0,2000), model:CFG.modelLabel, lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
     const body=JSON.stringify(Object.assign({image: await b64(P.full)}, doc));
     const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body});
     const j=await r.json();
@@ -725,7 +739,7 @@ async function sendIssue(){
   const P=state.pages[state.cur]; if (!P || P.sample) return;
   const img=`${state.name}_${P.no}쪽.jpg`;
   saveBlob(P.full, img);
-  const text=P.lines.map(l=>l.text).join('\n'), n=P.lines.filter(l=>l.text!==l.orig).length;
+  const text=P.lines.map(l=>l.text).join('\n')+(P.note?`\n\n[비고] ${P.note}`:''), n=P.lines.filter(l=>l.text!==l.orig).length;
   const q={template:'training.yml', title:`[학습 자료] ${state.name} ${P.no}쪽`, source:state.name, page:String(P.no),
     meta:`${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''} / 고친 행 ${n}개 / 판독기 ${location.host}${state.commons?' / 위키미디어 공용 '+state.commons:''}`, text};
   let url=CFG.issues+'?'+new URLSearchParams(q).toString(), copied=false;
@@ -744,7 +758,7 @@ async function sendTrain(){
     if (!image){ const r=await ASSETS.upload(P.full,{type:'image/jpeg'}); image=r.id; }
     P.imageId=image;
     const doc={src:state.name, page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
-      lines:P.lines.map(l=>({orig:l.orig,text:l.text})), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
+      lines:trainLines(P), note:(P.note||'').slice(0,2000), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
     await DB.collection('training').doc(key).set(doc);
     SENT.set(key, doc); renderPages();
     setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개.`);

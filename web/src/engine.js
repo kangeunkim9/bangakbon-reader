@@ -145,6 +145,13 @@ KP.segment = function(im){
     const a=xs[i], c=xs[i+1]; if (!(c-a > pp*0.5)) continue;
     let s=0; for (let x=a;x<c;x++) s+=colsum[x]; if (s>200) cols.push([a,c]);
   }
+  // 맨 가장자리 행: 바깥 경계가 이미지 밖이라 빠지던 것. 먹이 넉넉하면 이미지 끝까지를 한 행으로
+  if (cols.length){
+    const sum=(a,c)=>{ let s=0; for (let x=a;x<c;x++) s+=colsum[x]; return s; };
+    const ss=cols.map(([a,c])=>sum(a,c)).sort((u,v)=>u-v), med=ss.length%2?ss[(ss.length-1)/2]:(ss[ss.length/2-1]+ss[ss.length/2])/2;
+    if (xs[0]>pp*0.5){ const a=Math.max(0,Math.round(xs[0]-pp)); if (xs[0]-a>=0.7*pp && sum(a,xs[0])>0.3*med) cols.unshift([a,xs[0]]); }
+    const L=xs[xs.length-1]; if (W-1-L>pp*0.5){ const c=Math.min(W-1,Math.round(L+pp)); if (c-L>=0.7*pp && sum(L,c)>0.3*med) cols.push([L,c]); }
+  }
   if (frame){ t=T+4; bt=B-4; }
   [t, bt] = vbounds(b, bb, h3, W, Hh, t, bt);
   return {t, bt, cols: cols.reverse(), pitch: pp};

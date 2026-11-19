@@ -735,12 +735,15 @@ async function run(){
           setBar((done + (k+1)/seg.cols.length)/(state.total||1));
           if (state.cur===idx) renderCurrent(true);
           await idle();
+          // 처음 6행이 모두 거의 비면 표지·빈 면으로 보고 그 면은 그만 읽는다
+          if (k===5 && P.lines.every(l=>KP.graphemes(l.text)<3)) break;
         }
         // 가장자리에 새로 붙인 행이 글자가 아니면(테두리·얼룩) 뺀다
         const junk=k=>P.lines[k] && ((P.conf[k]||0)<0.6 || KP.graphemes(P.lines[k].text)<3);
         if (seg.edge && seg.edge.last && P.lines.length===P.cols.length && junk(P.lines.length-1)){ P.lines.pop(); P.cols.pop(); P.conf.pop(); }
         if (seg.edge && seg.edge.first && P.lines.length===P.cols.length && junk(0)){ P.lines.shift(); P.cols.shift(); P.conf.shift(); }
-        if (P.lines.length && median(P.lines.map(l=>KP.graphemes(l.text)))<8) P.status='nomatch';
+        const avgConf = P.conf && P.conf.length ? P.conf.reduce((u,v)=>u+v,0)/P.conf.length : 1;
+        if (P.lines.length && (median(P.lines.map(l=>KP.graphemes(l.text)))<8 || avgConf<0.55)) P.status='nomatch';
       }
       done++; renderPages(); if (state.cur===idx) renderCurrent();
     }
@@ -767,7 +770,7 @@ function renderPages(){
   if (state.pages.length<2){ nav.hidden=true; return; } nav.hidden=false;
   state.pages.forEach((p,i)=>{
     const b=document.createElement('button'); b.type='button';
-    b.innerHTML=`${plab(p)} <span class="n">${p.status==='ok'?p.lines.length+'행':'본문 없음'}</span>${sentDoc(p)?'<span class="s">보냄</span>':''}`;
+    b.innerHTML=`${plab(p)} <span class="n">${p.status==='ok'?p.lines.length+'행':p.status==='nomatch'?'표지·빈 면?':'본문 없음'}</span>${sentDoc(p)?'<span class="s">보냄</span>':''}`;
     if (p.status!=='ok') b.classList.add('empty');
     b.setAttribute('aria-current', i===state.cur?'true':'false');
     b.onclick=()=>{ state.cur=i; renderPages(); renderCurrent(); };
@@ -781,9 +784,10 @@ function renderCurrent(partial){
   if (!P){ facs.innerHTML='<div class="none">아직 판독한 면이 없습니다.</div>'; body.innerHTML=''; return; }
   const label = state.name ? `${state.name} · ${plab(P)}` : plab(P);
   $('facsTitle').textContent='판본 · '+plab(P); $('textTitle').textContent='판독문 · '+plab(P);
-  if (!facs.dataset.k || facs.dataset.k!==P.url+'|'+P.cols.length){
-    facs.dataset.k=P.url+'|'+P.cols.length;
-    const rects = P.cols.map(([a,c],k)=>`<rect class="c${k%2}" data-k="${k}" x="${a}" y="${P.t}" width="${c-a}" height="${P.bt-P.t}"/><text x="${(a+c)/2}" y="${Math.max(24,P.t-10)}">${k+1}</text>`).join('');
+  const hideBox = P.status==='nomatch' && !P.reveal;
+  if (!facs.dataset.k || facs.dataset.k!==P.url+'|'+P.cols.length+'|'+hideBox){
+    facs.dataset.k=P.url+'|'+P.cols.length+'|'+hideBox;
+    const rects = (hideBox ? [] : P.cols).map(([a,c],k)=>`<rect class="c${k%2}" data-k="${k}" x="${a}" y="${P.t}" width="${c-a}" height="${P.bt-P.t}"/><text x="${(a+c)/2}" y="${Math.max(24,P.t-10)}">${k+1}</text>`).join('');
     facs.innerHTML=`<div class="stage"><img src="${P.url}" alt="${esc(label)} 사진" width="${P.W}" height="${P.H}"><svg viewBox="0 0 ${P.W} ${P.H}" preserveAspectRatio="none" role="img" aria-label="행 나눈 틀 ${P.cols.length}개">${rects}</svg></div>`;
     facs.querySelectorAll('rect').forEach(r=>r.addEventListener('click',()=>{ select(+r.dataset.k, true); }));
   }
@@ -794,7 +798,10 @@ function renderCurrent(partial){
   }
   body.dataset.no=plab(P);
   if (P.status==='empty'){ body.innerHTML='<div class="notice">본문 행을 찾지 못했습니다. 표지, 빈 면, 훼손된 면일 수 있습니다.</div>'; return; }
-  body.innerHTML = (P.status==='nomatch' ? '<div class="notice">행이 너무 짧게 읽혔습니다. 본문이 아닌 면이거나 행 나누기가 어긋났을 수 있습니다.</div>' : '');
+  if (P.status==='nomatch' && !P.reveal && !partial){
+    body.innerHTML='<div class="notice">표지나 빈 면처럼 보여서 판독문을 숨겼습니다. 본문이 있는 면이라면 행 나누기가 어긋났을 수 있습니다. <button type="button" id="revealLines">그래도 행 보기</button></div>';
+    $('revealLines').onclick=()=>{ P.reveal=true; renderCurrent(); renderTrain(); }; return; }
+  body.innerHTML = (P.status==='nomatch' ? '<div class="notice">표지나 빈 면처럼 보이는 면입니다. 본문이 맞다면 고쳐서 보내 주세요.</div>' : '');
   const wrap=document.createElement('div'); if (state.vert) wrap.className='vert';
   const ol=document.createElement('ol'); ol.className='lines'; ol.setAttribute('aria-label','판독문, 오른쪽 행부터');
   P.lines.forEach((_,k)=>ol.appendChild(lineItem(P,k)));
@@ -1045,7 +1052,7 @@ const sentDoc=(P)=>(!P.sample && state.fileKey) ? SENT.get(pageKey(P)) : null;
 function renderTrain(){
   const P=state.pages[state.cur], bar=$('trainbar');
   const can = (DB && ASSETS) || CFG.inbox;
-  const ok = can && P && !P.sample && P.status!=='empty' && P.lines.length && !state.running;
+  const ok = can && P && !P.sample && P.status!=='empty' && !(P.status==='nomatch' && !P.reveal) && P.lines.length && !state.running;
   $('trainBy').hidden = $('trainNote').hidden = !(CFG.github && ok);
   bar.hidden=!ok;
   if (ok){

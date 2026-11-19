@@ -212,7 +212,6 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <div class="panel" id="textPanel">
       <div class="ph">
         <h2 id="textTitle">판독문</h2><span class="sp"></span>
-        <button id="vert" aria-pressed="false">세로로 대조</button>
         <button id="copyPage">이 면 복사</button>
       </div>
       <div class="trainbar" id="trainbar" hidden>
@@ -863,7 +862,6 @@ if (CFG.github && CFG.inbox) $('teach').hidden=false;
 (()=>{ if (!CFG.github) return; const q=new URLSearchParams(location.search), f=q.get('f'), pg=+q.get('p');
   if (f && /^File:[^\/]+\.pdf$/i.test(f) && pg>0) setTimeout(()=>openCommons(f, (q.get('n')||f.replace(/^File:|\.pdf$/gi,'')).slice(0,40), pg), 300); })();
 $('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
-$('vert').onclick=()=>{ state.vert=!state.vert; $('vert').setAttribute('aria-pressed',state.vert); $('vert').textContent=state.vert?'가로로 보기':'세로로 대조'; renderCurrent(); };
 
 // ---------- 예시 면 ----------
 state.name = SAMPLE.name; state.useLM = !!CFG.lm;

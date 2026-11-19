@@ -104,7 +104,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .facs svg text{font:600 26px var(--f-mono);fill:var(--box);paint-order:stroke;stroke:var(--surface);stroke-width:6px;text-anchor:middle;pointer-events:none}
 .facs .none{padding:40px 16px;text-align:center;color:var(--muted)}
 .lines{list-style:none;margin:0;padding:6px 0;counter-reset:ln}
-.lines li{display:grid;grid-template-columns:2.4em minmax(0,1fr);gap:6px;padding:5px 14px;border-left:3px solid transparent;align-items:baseline}
+.lines li{display:grid;grid-template-columns:2.4em minmax(0,1fr) auto;gap:6px;padding:5px 14px;border-left:3px solid transparent;align-items:baseline}
 .lines li.on{background:var(--accent-soft);border-left-color:var(--accent)}
 .lines li .no{font:500 .78rem var(--f-mono);color:var(--muted);text-align:right;cursor:pointer;user-select:none}
 .lines li .tx{font-family:var(--f-old);font-size:1.18rem;line-height:1.6;word-break:break-all;outline:none;border-radius:3px;padding:0 3px}
@@ -141,7 +141,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .linetools textarea{font:inherit;font-size:.88rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;resize:vertical;min-height:2.6em}
 .lines li.added .no{color:var(--accent)}
 .lines li .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:0 4px;grid-column:3}
-.lines li.added{grid-template-columns:2.4em minmax(0,1fr) auto}
+.lines li .del{opacity:.45}
+.lines li:hover .del,.lines li .del:focus-visible,.lines li.added .del{opacity:1}
+.lines li.removed .tx{text-decoration:line-through;opacity:.45;pointer-events:none}
+.lines li.removed .no{color:var(--warn)}
+.lines li.removed .no::after{content:"·뺌";font-size:.68rem;margin-left:1px}
 .oldk .imesw{display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:600;margin-right:6px}
 .oldk .imesw input{width:18px;height:18px;accent-color:var(--accent)}
 .oldk .help kbd{font-family:var(--f-mono);border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--bg)}
@@ -776,14 +780,21 @@ function renderCurrent(partial){
   if (active>=0) select(active,false);
 }
 function lineItem(P,k){
-  const L=P.lines[k]; const li=document.createElement('li'); li.dataset.k=k; if (L.text!==L.orig) li.classList.add('edited');
+  const L=P.lines[k]; const li=document.createElement('li'); li.dataset.k=k; if (L.text!==L.orig && !L.removed) li.classList.add('edited');
   const no=document.createElement('span'); no.className='no'; no.textContent=k+1; no.title=(k+1)+'행 틀 보기';
   const tx=document.createElement('span'); tx.className='tx'; tx.spellcheck=false; tx.textContent=L.text;
   tx.setAttribute('aria-label',(k+1)+'행');
   li.append(no,tx); bindLine(tx);
   no.addEventListener('click',()=>select(k,true));
-  if (L.added){ li.classList.add('added'); no.title='직접 넣은 행'; const del=document.createElement('button'); del.type='button'; del.className='del'; del.textContent='✕'; del.setAttribute('aria-label',(k+1)+'행 빼기');
-    del.onclick=()=>{ P.lines.splice(k,1); renderCurrent(); renderEditInfo(); }; li.appendChild(del); }
+  const del=document.createElement('button'); del.type='button'; del.className='del';
+  if (L.added){ li.classList.add('added'); no.title='직접 넣은 행'; del.textContent='✕'; del.title='이 행 빼기'; del.setAttribute('aria-label',(k+1)+'행 빼기');
+    del.onclick=()=>{ P.lines.splice(k,1); renderCurrent(); renderEditInfo(); }; }
+  else {   // 글자 없는 자리를 행으로 잘못 센 경우: 지우지 않고 '뺌'으로 표시해 둔다 (행 틀 번호가 어긋나지 않게)
+    if (L.removed) li.classList.add('removed');
+    del.textContent = L.removed ? '되살리기' : '✕'; del.title = L.removed ? '뺀 행 되살리기' : '글자가 없는 행이면 빼기';
+    del.setAttribute('aria-label',(k+1)+(L.removed?'행 되살리기':'행 빼기'));
+    del.onclick=()=>{ L.removed=!L.removed; renderCurrent(); renderEditInfo(); }; }
+  li.appendChild(del);
   return li;
 }
 // ---------- 옛한글 자판 (두벌식 + 옛글자 규칙) ----------
@@ -812,7 +823,7 @@ function setT(tx,v,pos){
   if (IME.on){ const L=lineOf(tx); pushUndo(tx,L.text); L.text=v; ED.tx=tx; ED.pos=ED.anc=pos; paint(tx); lineChanged(tx); }
   else { tx.textContent=v; setCaretCE(tx,pos); tx.dispatchEvent(new Event('input')); }
 }
-function lineChanged(tx){ const L=lineOf(tx); tx.closest('li').classList.toggle('edited', L.text!==L.orig); renderEditInfo(); }
+function lineChanged(tx){ const L=lineOf(tx); tx.closest('li').classList.toggle('edited', L.text!==L.orig && !L.removed); renderEditInfo(); }
 function pushUndo(tx,old){ const k=tx.closest('li').dataset.k+'/'+state.cur; const st=ED.undo.get(k)||[]; if (st[st.length-1]!==old){ st.push(old); if (st.length>200) st.shift(); } ED.undo.set(k,st); }
 function caretIn(tx){ return IME.on ? (ED.tx===tx ? ED.pos : null) : caretInCE(tx); }
 function setCaret(tx,pos){ if (IME.on){ ED.tx=tx; ED.pos=ED.anc=pos; paint(tx); } else setCaretCE(tx,pos); }
@@ -979,16 +990,18 @@ function select(k, scroll){
   if (scroll){ const li=document.querySelector(`.lines li[data-k="${k}"]`); if (li){ li.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'}); const t=li.querySelector('.tx'); if (IME.on) focusLine(t); else t.focus({preventScroll:true}); } }
 }
 function renderEditInfo(){
-  const n = state.pages.reduce((a,p)=>a+p.lines.filter(l=>l.text!==l.orig).length,0);
+  const n = state.pages.reduce((a,p)=>a+p.lines.filter(lchg).length,0);
   $('editInfo').textContent = n ? `고친 행 ${n}개` : '';
 }
 const esc = (s)=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 // ---------- 내보내기 ----------
-function pageText(P){ return `## ${P.no}쪽\n` + (P.status==='empty' ? '(본문 없음)\n' : P.status==='nomatch' ? '(본문을 찾지 못함: 표지·빈 면·훼손 면일 수 있음)\n' + P.lines.map(l=>l.text).join('\n')+'\n' : P.lines.map(l=>l.text).join('\n')+'\n'); }
+function lchg(l){ return !!l.removed || l.text!==l.orig; }
+function live(P){ return P.lines.filter(l=>!l.removed); }
+function pageText(P){ return `## ${P.no}쪽\n` + (P.status==='empty' ? '(본문 없음)\n' : P.status==='nomatch' ? '(본문을 찾지 못함: 표지·빈 면·훼손 면일 수 있음)\n' + live(P).map(l=>l.text).join('\n')+'\n' : live(P).map(l=>l.text).join('\n')+'\n'); }
 function allText(){
   const d=new Date(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const n = state.pages.reduce((a,p)=>a+p.lines.filter(l=>l.text!==l.orig).length,0);
+  const n = state.pages.reduce((a,p)=>a+p.lines.filter(lchg).length,0);
   return `# ${state.name} 자동 판독 (방각본 판독기 ${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''})\n# 오른쪽 행부터 차례로, 한 줄 = 판본 한 행\n# 판독일 ${ds}${n?`, 사람이 고친 행 ${n}개`:''}\n\n` + state.pages.map(pageText).join('\n');
 }
 async function copyText(t, okMsg){
@@ -1007,15 +1020,15 @@ function renderTrain(){
   $('trainBy').hidden = $('trainNote').hidden = !(CFG.github && ok);
   bar.hidden=!ok;
   if (ok){
-    const d=sentDoc(P), n=P.lines.filter(l=>l.text!==l.orig).length;
+    const d=sentDoc(P), n=P.lines.filter(lchg).length;
     $('sendTrain').textContent = d ? '고친 내용으로 다시 보내기' : '검수 끝, 학습용으로 보내기';
-    $('trainHint').innerHTML = d ? `<span class="done">학습용으로 보냈습니다</span> (${new Date(d.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}, 고친 행 ${d.lines.filter(l=>l.text!==l.orig).length}개). 더 고쳤다면 다시 보내 주세요.`
+    $('trainHint').innerHTML = d ? `<span class="done">학습용으로 보냈습니다</span> (${new Date(d.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}, 고친 행 ${d.lines.filter(lchg).length}개). 더 고쳤다면 다시 보내 주세요.`
       : `모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □, 반복 부호는 〃로 적어 주세요.${n?` 지금 고친 행 ${n}개.`:''}`;
   }
   if (DB || CFG.inbox){ let pages=0, lines=0; for (const d of SENT.values()){ pages++; lines+=(d.lines||[]).length; } $('trainCount').textContent = pages ? `${DB?'학습용으로 모은 면':'이번에 보낸 면'} ${pages}면, 행 ${lines}개` : ''; }
 }
 function b64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
-function trainLines(P){ return P.lines.map(l=>l.added?{orig:'',text:l.text,added:true}:{orig:l.orig,text:l.text}); }
+function trainLines(P){ return P.lines.map(l=>l.added?{orig:'',text:l.text,added:true}:l.removed?{orig:l.orig,text:'',removed:true}:{orig:l.orig,text:l.text}); }
 try { $('trainBy').value = localStorage.getItem('trainBy')||''; } catch(e){}
 $('trainBy').addEventListener('change',()=>{ try { localStorage.setItem('trainBy',$('trainBy').value.trim()); } catch(e){} });
 async function sendInbox(P){
@@ -1028,7 +1041,7 @@ async function sendInbox(P){
     const j=await r.json();
     if (!j.ok) throw {code:j.error};
     SENT.set(pageKey(P), doc); renderPages(); loadCounts();
-    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
+    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='daily_limit') setMsg('오늘 받을 수 있는 분량이 찼습니다. 내일 다시 보내 주세요.', true);
@@ -1060,7 +1073,7 @@ async function sendTrain(){
       lines:trainLines(P), note:(P.note||'').slice(0,2000), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
     await DB.collection('training').doc(key).set(doc);
     SENT.set(key, doc); renderPages();
-    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개.`);
+    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='quota_exceeded'||c==='quota_or_state') setMsg('학습 자료 저장 공간이 찼습니다. 고전소설 연구실에 알려 주세요.', true);
@@ -1079,7 +1092,7 @@ $('sendTrain').onclick=sendTrain;
   }
   renderTrain();
 })();
-$('copyPage').onclick=()=>{ const P=state.pages[state.cur]; if (P) copyText(P.lines.map(l=>l.text).join('\n'), `${P.no}쪽 판독문을 복사했습니다.`); };
+$('copyPage').onclick=()=>{ const P=state.pages[state.cur]; if (P) copyText(live(P).map(l=>l.text).join('\n'), `${P.no}쪽 판독문을 복사했습니다.`); };
 $('copyAll').onclick=()=>copyText(allText(), '전체 판독문을 복사했습니다.');
 let downloads=null;
 $('saveAll').onclick=async()=>{

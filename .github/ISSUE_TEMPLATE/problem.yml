@@ -1,0 +1,17 @@
+name: 판독기 문제 알리기
+description: 판독기가 잘 안 되거나 이상하게 움직일 때 알려 주세요.
+title: "[문제] "
+labels: ["문제"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 무엇이 문제인가요?
+      description: 어떤 면에서, 무엇을 했을 때, 어떻게 되었는지 적어 주세요. 화면을 찍은 사진이 있으면 끌어다 놓아 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 쓰던 환경
+      description: 판독기 아래 '문제 알리기'에서 보내면 자동으로 채워집니다.

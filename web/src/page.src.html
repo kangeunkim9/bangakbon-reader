@@ -43,6 +43,12 @@ h2{font:600 1rem/1.3 var(--f-ui);margin:0}
 .about .credit{grid-column:1/-1;border-top:1px solid var(--line);padding-top:12px;margin:4px 0 0;font-size:.84rem}
 .about .credit a{color:var(--accent)}
 .tag{font:500 .75rem/1 var(--f-mono);color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:5px 9px;white-space:nowrap}
+.report{max-width:1200px;margin:24px auto 32px;padding:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.report details{border-top:1px solid var(--line);padding-top:12px}
+.report summary{cursor:pointer;color:var(--muted);font-size:.9rem}
+.report p{font-size:.86rem;color:var(--muted);max-width:80ch}
+.report textarea{width:100%;box-sizing:border-box;font:inherit;font-size:.9rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;resize:vertical}
+.reportrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px}
 button,.btn{font:500 .9rem var(--f-ui);border-radius:var(--r);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;cursor:pointer;min-height:38px}
 button:hover,.btn:hover{border-color:var(--accent)}
 button:focus-visible,.btn:focus-within,input:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -55,7 +61,9 @@ button:disabled{opacity:.5;cursor:default}
 .teach h2{font-size:1.05rem;margin:0 0 6px}
 .teach p{margin:0 0 4px;max-width:80ch;font-size:.9rem}
 .teach .how{color:var(--muted);font-size:.82rem}
-.teach .go{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.teach .go{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.teach .go .count{flex-basis:100%}
+a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .teach .count{font-size:.8rem;color:var(--muted)}
 .intake{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
 .drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;min-height:84px;background:var(--bg)}
@@ -175,6 +183,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     </div>
     <div class="go">
       <button class="primary" id="randomPage" type="button">고칠 면 하나 받기</button>
+      <a class="btn" id="contribLink" href="contributors.html" target="_blank" rel="noopener">함께 고친 사람들</a>
       <span class="count" id="teachCount"></span>
     </div>
   </section>
@@ -217,10 +226,9 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       </div>
       <div class="trainbar" id="trainbar" hidden>
         <p id="trainHint">모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.</p>
-        <input id="trainBy" class="ghonly-in" hidden placeholder="보내는 사람 (선택)" aria-label="보내는 사람 이름, 선택" maxlength="40">
+        <input id="trainBy" class="ghonly-in" hidden placeholder="이름 (선택)" aria-label="보내는 사람 이름, 선택" maxlength="40">
         <button class="primary" id="sendTrain">검수 끝, 학습용으로 보내기</button>
-        <button id="sendIssue" hidden title="GitHub 계정이 있으면 이슈로도 보낼 수 있습니다">GitHub 이슈로 보내기</button>
-        <p class="trainnote" id="trainNote" hidden>보낸 면 사진과 판독문은 판독기 학습과 연구에 쓰입니다.</p>
+        <p class="trainnote" id="trainNote" hidden>보낸 면 사진과 판독문은 판독기 학습과 연구에 쓰입니다. 이름을 적으면 <a href="contributors.html" target="_blank" rel="noopener">함께 고친 사람들</a>에 보낸 면 수와 함께 올라갑니다.</p>
       </div>
       <div class="oldk" id="oldk" hidden aria-label="옛한글 입력">
         <label class="imesw"><input type="checkbox" id="imeOn" checked> 옛한글 자판</label>
@@ -269,6 +277,15 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
         <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 학습용 전사는 국립국어원이 제공하는 KOHICO(국어 역사 말뭉치)를 썼습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
   </section>
 </div>
+
+<footer class="report" aria-label="문제 알리기">
+  <details id="reportBox">
+    <summary>판독기가 잘 안 되나요? 문제 알리기</summary>
+    <p>버튼이 안 눌린다, 면이 안 열린다, 행이 이상하게 나뉜다처럼 <b>판독기 자체의 문제</b>를 적어 주세요. 판독문 고친 것은 위의 '학습용으로 보내기'로 보내 주시면 됩니다.</p>
+    <textarea id="reportText" rows="4" maxlength="4000" placeholder="어떤 면에서, 무엇을 했을 때, 어떻게 되었는지 적어 주세요."></textarea>
+    <div class="reportrow"><button id="reportSend" type="button">GitHub 이슈로 보내기</button><span class="trainnote">GitHub 쓰기 창이 열립니다. GitHub 계정이 필요합니다.</span></div>
+  </details>
+</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.wasm.min.js"></script>
 <script>
@@ -705,7 +722,7 @@ function renderTrain(){
   const P=state.pages[state.cur], bar=$('trainbar');
   const can = (DB && ASSETS) || CFG.inbox;
   const ok = can && P && !P.sample && P.status!=='empty' && P.lines.length && !state.running;
-  $('sendIssue').hidden = !(CFG.github && ok); $('trainBy').hidden = $('trainNote').hidden = !(CFG.github && ok);
+  $('trainBy').hidden = $('trainNote').hidden = !(CFG.github && ok);
   bar.hidden=!ok;
   if (ok){
     const d=sentDoc(P), n=P.lines.filter(l=>l.text!==l.orig).length;
@@ -733,24 +750,18 @@ async function sendInbox(P){
   } catch(e){
     const c=e&&e.code;
     if (c==='daily_limit') setMsg('오늘 받을 수 있는 분량이 찼습니다. 내일 다시 보내 주세요.', true);
-    else if (c==='too_large') setMsg('면 사진이 너무 큽니다. GitHub 이슈로 보내 주세요.', true);
-    else setMsg('보내지 못했습니다. 잠시 뒤 다시 누르거나 GitHub 이슈로 보내 주세요. ('+(c||e)+')', true);
+    else if (c==='too_large') setMsg('면 사진이 너무 큽니다. 더 작은 사진으로 다시 올려 주세요.', true);
+    else setMsg('보내지 못했습니다. 잠시 뒤 다시 눌러 주세요. ('+(c||e)+')', true);
   } finally { btn.disabled=false; renderTrain(); }
 }
-function saveBlob(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 60000); }
-async function sendIssue(){
-  const P=state.pages[state.cur]; if (!P || P.sample) return;
-  const img=`${state.name}_${P.no}쪽.jpg`;
-  saveBlob(P.full, img);
-  const text=P.lines.map(l=>l.text).join('\n')+(P.note?`\n\n[비고] ${P.note}`:''), n=P.lines.filter(l=>l.text!==l.orig).length;
-  const q={template:'training.yml', title:`[학습 자료] ${state.name} ${P.no}쪽`, source:state.name, page:String(P.no),
-    meta:`${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''} / 고친 행 ${n}개 / 판독기 ${location.host}${state.commons?' / 위키미디어 공용 '+state.commons:''}`, text};
-  let url=CFG.issues+'?'+new URLSearchParams(q).toString(), copied=false;
-  if (url.length>7800){ delete q.text; url=CFG.issues+'?'+new URLSearchParams(q).toString(); try { await navigator.clipboard.writeText(text); copied=true; } catch(e){} }
-  window.open(url,'_blank','noopener');
-  setMsg(`GitHub 이슈 쓰기 창을 열었습니다. 방금 내려받은 ${img} 파일을 '면 사진' 칸에 끌어다 놓고 제출해 주세요.${copied?' 판독문이 길어서 클립보드에 복사해 두었으니 판독문 칸에 붙여 넣어 주세요.':''}`);
+function reportIssue(){
+  const t=$('reportText').value.trim(); if (!t){ $('reportText').focus(); return; }
+  const P=state.pages[state.cur];
+  const env=[`판독기: ${location.host||'연구팀용'} / ${CFG.modelLabel}`, `브라우저: ${navigator.userAgent}`, `화면: ${innerWidth}×${innerHeight}`, state.name?`보던 자료: ${state.name}${P?' '+P.no+'쪽':''}${state.commons?' (위키미디어 공용 '+state.commons+')':''}`:''].filter(Boolean).join('\n');
+  const title='[문제] '+t.split('\n')[0].slice(0,60);
+  window.open(CFG.issues+'?'+new URLSearchParams({template:'problem.yml',title,what:t,env}).toString(),'_blank','noopener');
 }
-$('sendIssue').onclick=sendIssue;
+$('reportSend').onclick=reportIssue;
 async function sendTrain(){
   const P0=state.pages[state.cur]; if (P0 && !P0.sample && !(DB && ASSETS) && CFG.inbox) return sendInbox(P0);
   const P=state.pages[state.cur]; if (!P || !DB || !ASSETS || P.sample) return;

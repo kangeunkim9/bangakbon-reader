@@ -20,3 +20,7 @@ SK = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
       '</head><body>')
 open(f'{H}/../index.html', 'w', encoding='utf-8').write(SK + gh + '</body></html>\n')
 print('web/index.html', len(gh))
+# 함께 고친 사람들 페이지
+assert INBOX, 'inbox_url.txt가 없습니다'
+open(f'{H}/../contributors.html', 'w', encoding='utf-8').write(open(f'{H}/contributors.src.html', encoding='utf-8').read().replace('__INBOX__', INBOX))
+print('web/contributors.html')

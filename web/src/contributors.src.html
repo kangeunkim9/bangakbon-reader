@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>함께 고친 사람들 · 방각본 판독기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eef0ec; --surface:#fbfcfa; --sunk:#e3e6e1; --ink:#1b1f24; --muted:#5b636b; --line:#cfd4ce;
+  --accent:#264a7c; --accent-soft:rgba(38,74,124,.12);
+  --f-display:"Gowun Batang","Noto Serif KR",serif;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#14171b; --surface:#1c2025; --sunk:#111418; --ink:#e4e7ea; --muted:#9aa3ab; --line:#30363d;
+  --accent:#8eb0e8; --accent-soft:rgba(142,176,232,.16); color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-ui);padding-block:24px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:820px;margin:0 auto}
+a{color:var(--accent)}
+.back{font-size:.9rem}
+h1{font:700 1.8rem/1.25 var(--f-display);margin:12px 0 6px;text-wrap:balance}
+.lede{color:var(--muted);margin:0 0 20px;max-width:65ch}
+.stats{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 20px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 16px;min-width:140px}
+.stat b{display:block;font:600 1.5rem/1.2 var(--f-ui);font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:.85rem}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:500;color:var(--muted);font-size:.82rem;background:var(--sunk)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+th.n{text-align:right}
+tr:last-child td{border-bottom:0}
+td.who{white-space:normal;word-break:break-all}
+.anon td.who{color:var(--muted)}
+.bar{display:inline-block;height:6px;border-radius:3px;background:var(--accent);vertical-align:middle;margin-left:8px;opacity:.7}
+.note{color:var(--muted);font-size:.85rem;margin-top:14px;max-width:65ch}
+.msg{padding:16px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← 방각본 판독기로 돌아가기</a>
+  <h1>함께 고친 사람들</h1>
+  <p class="lede">판독기가 읽은 방각본 면을 직접 고쳐 보내 주신 분들입니다. 보내 주신 면은 다음 판독 모델을 학습시키는 데 쓰입니다. 고맙습니다.</p>
+  <div class="stats" id="stats" hidden>
+    <div class="stat"><b id="sPages">0</b><span>모인 면</span></div>
+    <div class="stat"><b id="sLines">0</b><span>고친 행</span></div>
+    <div class="stat"><b id="sPeople">0</b><span>이름을 밝힌 분</span></div>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>이름</th><th class="n">보낸 면</th><th class="n">고친 행</th><th>처음 보낸 날</th><th>마지막 보낸 날</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="5" class="msg">불러오는 중…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="note">판독기에서 '학습용으로 보내기'를 누를 때 이름 칸에 적은 이름이 여기에 올라갑니다. 이름을 비우고 보낸 면은 '이름 없이 보내 주신 분들'에 모아 셉니다. 고친 행은 판독기가 읽은 것과 달라진 행과 새로 넣은 행을 센 것입니다. 이름을 내리고 싶으시면 판독기 아래 '문제 알리기'로 알려 주세요.</p>
+</div>
+<script>
+const INBOX = '__INBOX__';
+const $ = id => document.getElementById(id);
+const num = n => n.toLocaleString('ko-KR');
+function td(text, cls){ const e=document.createElement('td'); if (cls) e.className=cls; e.textContent=text; return e; }
+(async () => {
+  const body = $('rows');
+  try {
+    const j = await (await fetch(INBOX)).json();
+    const L = (j.contributors || []).slice();
+    const named = L.filter(r => r.name), anon = L.filter(r => !r.name);
+    const A = anon.reduce((a, r) => ({name:'', pages:a.pages+r.pages, lines:a.lines+r.lines,
+      first: !a.first || r.first < a.first ? r.first : a.first, last: !a.last || r.last > a.last ? r.last : a.last}), {pages:0, lines:0, first:'', last:''});
+    named.sort((a, b) => b.pages - a.pages || b.lines - a.lines || a.first.localeCompare(b.first));
+    const all = named.concat(A.pages ? [A] : []);
+    const max = Math.max(1, ...all.map(r => r.pages));
+    $('sPages').textContent = num(all.reduce((s, r) => s + r.pages, 0));
+    $('sLines').textContent = num(all.reduce((s, r) => s + r.lines, 0));
+    $('sPeople').textContent = num(named.length);
+    $('stats').hidden = false;
+    body.textContent = '';
+    if (!all.length){ body.innerHTML = '<tr><td colspan="5" class="msg">아직 보내 주신 면이 없습니다. 첫 번째로 이름을 올려 주세요.</td></tr>'; return; }
+    for (const r of all){
+      const tr = document.createElement('tr'); if (!r.name) tr.className = 'anon';
+      tr.append(td(r.name || '이름 없이 보내 주신 분들', 'who'));
+      const p = td(num(r.pages), 'n'); const bar = document.createElement('span'); bar.className='bar'; bar.style.width = Math.round(60*r.pages/max)+'px'; p.append(bar);
+      tr.append(p, td(num(r.lines), 'n'), td(r.first || ''), td(r.last || ''));
+      body.append(tr);
+    }
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="5" class="msg">목록을 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.</td></tr>';
+  }
+})();
+</script>
+</body>
+</html>

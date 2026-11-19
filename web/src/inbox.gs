@@ -18,9 +18,36 @@ function out_(o) {
 
 // 면별로 몇 번 받았는지 (판독기가 아직 덜 고쳐진 면을 고를 때 씀)
 function counts_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('cnt') || '{}'); } catch (e) { return {}; } }
+// 함께 고친 사람들: 이름별 보낸 면 수, 고친 행 수, 처음·마지막 보낸 날
+// 이름을 비우고 보낸 면은 '' 아래에 모인다. 목록에서 숨길 이름은 스크립트 속성 'hide'에 쉼표로 적는다.
+function who_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('who') || 'null'); } catch (e) { return null; } }
+function addWho_(w, d) {
+  var name = String(d.by || '').trim().slice(0, 40), day = String(d.at || new Date().toISOString()).slice(0, 10);
+  var n = 0, L = d.lines || [];
+  for (var i = 0; i < L.length; i++) if (L[i] && (L[i].added || L[i].text !== L[i].orig)) n++;
+  var r = w[name] || (w[name] = {p: 0, l: 0, f: day, t: day});
+  r.p += 1; r.l += n; if (day < r.f) r.f = day; if (day > r.t) r.t = day;
+}
+// 처음 한 번: 지금까지 받은 JSON을 훑어 목록을 만든다
+function rebuildWho_() {
+  var w = {}, root = folder_(folder_(DriveApp.getRootFolder(), ROOT), BOX), days = root.getFolders();
+  while (days.hasNext()) {
+    var fs = days.next().getFilesByType('application/json');
+    while (fs.hasNext()) { try { addWho_(w, JSON.parse(fs.next().getBlob().getDataAsString())); } catch (e) {} }
+  }
+  PropertiesService.getScriptProperties().setProperty('who', JSON.stringify(w));
+  return w;
+}
 function doGet() {
   var c = counts_(), total = 0; for (var k in c) total += c[k];
-  return out_({ok: true, service: '방각본 판독기 학습 자료 창구', total: total, counts: c});
+  var w = who_(); if (!w) w = rebuildWho_();
+  var hide = String(PropertiesService.getScriptProperties().getProperty('hide') || '').split(','), list = [];
+  for (var nm in w) {
+    if (/^Claude 시험/.test(nm)) continue;   // 판독기를 만들며 보낸 시험 면
+    var shown = nm && hide.indexOf(nm) < 0 ? nm : '';
+    list.push({name: shown, pages: w[nm].p, lines: w[nm].l, first: w[nm].f, last: w[nm].t});
+  }
+  return out_({ok: true, service: '방각본 판독기 학습 자료 창구', total: total, counts: c, contributors: list});
 }
 
 function doPost(e) {
@@ -42,6 +69,7 @@ function doPost(e) {
       var ck = String(d.commons || d.src || '').replace(/^File:/, '').replace(/\.pdf$/i, '').slice(-24) + '|' + String(d.page || '');
       var c = counts_(); c[ck] = (c[ck] || 0) + 1; props.setProperty('cnt', JSON.stringify(c));
     } catch (x) {}
+    try { var w = who_() || rebuildWho_(); addWho_(w, d); props.setProperty('who', JSON.stringify(w)); } catch (x) {}
 
     var root = folder_(folder_(DriveApp.getRootFolder(), ROOT), BOX);
     var dir = folder_(root, day);

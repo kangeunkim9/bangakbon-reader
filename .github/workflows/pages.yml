@@ -22,7 +22,7 @@ jobs:
       - name: 웹 파일만 모으기
         run: |
           mkdir _site
-          cp web/index.html web/sample.jpg web/charset_v*.json web/model_v*_*.wasm web/ort-wasm-simd.wasm _site/
+          cp web/index.html web/contributors.html web/sample.jpg web/charset_v*.json web/model_v*_*.wasm web/ort-wasm-simd.wasm _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

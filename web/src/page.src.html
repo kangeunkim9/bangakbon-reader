@@ -94,7 +94,8 @@ button:disabled{opacity:.5;cursor:default}
 .lines li .tx{font-family:var(--f-old);font-size:1.18rem;line-height:1.6;word-break:break-all;outline:none;border-radius:3px;padding:0 3px}
 .lines li.edited .no{color:var(--ok)}
 .lines li.edited .no::after{content:"·고침";font-size:.68rem;margin-left:1px}
-.vert .lines{writing-mode:vertical-rl;display:flex;flex-direction:column;flex-wrap:nowrap;height:min(78vh,820px);overflow-x:auto;padding:12px 8px}
+.vert{overflow-x:auto;max-width:100%;direction:rtl}
+.vert .lines{direction:ltr;width:max-content;writing-mode:vertical-rl;display:flex;flex-direction:column;flex-wrap:nowrap;height:min(78vh,820px);overflow-x:auto;padding:12px 8px}
 .vert .lines li{display:flex;flex-direction:column;gap:8px;padding:10px 4px;border-left:0;border-top:3px solid transparent;align-items:center}
 .vert .lines li.on{border-top-color:var(--accent)}
 .vert .lines li .no{writing-mode:horizontal-tb;text-align:center}
@@ -109,6 +110,15 @@ button:disabled{opacity:.5;cursor:default}
 .oldk .lab:first-child{margin-left:0}
 .oldk button{font-family:var(--f-old);font-size:1.15rem;min-height:34px;min-width:34px;padding:2px 6px;line-height:1}
 .oldk .help{flex-basis:100%;font-size:.8rem;color:var(--muted);margin-top:2px;font-family:var(--f-old)}
+.kbd{position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;pointer-events:none}
+.lines li .tx[role=textbox]{cursor:text;user-select:none;-webkit-user-select:none;white-space:pre-wrap}
+.tx .sel{background:var(--accent-soft);outline:1px solid var(--accent-soft)}
+.tx .compseg{text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px}
+.tx .caret{display:inline-block;width:0;height:1.2em;border-left:2px solid var(--accent);margin-right:-2px;vertical-align:-0.2em;animation:blink 1.06s steps(1) infinite}
+.vert .tx .caret{width:1.2em;height:0;border-left:0;border-top:2px solid var(--accent);margin:0 0 -2px 0}
+.tx .caret.comp{animation:none}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.tx .caret{animation:none}}
 .oldk .imesw{display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:600;margin-right:6px}
 .oldk .imesw input{width:18px;height:18px;accent-color:var(--accent)}
 .oldk .help kbd{font-family:var(--f-mono);border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--bg)}
@@ -137,7 +147,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 <div class="wrap">
   <header class="head">
     <h1>방각본 판독기</h1>
-    <span class="tag" id="ver">판독 모델 5차 · 2026.11</span>
+    <span class="tag" id="ver">시험판 · 판독 모델 5차 · 2026.11</span>
     <p>방각본 한글 소설의 면 사진을 판본 행 그대로 텍스트로 옮깁니다.</p>
     <p class="by">만든 사람 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> · 성균관대학교 국어국문학과 BK 교육연구단</p>
   </header>
@@ -188,13 +198,9 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       </div>
       <div class="oldk" id="oldk" hidden aria-label="옛한글 입력">
         <label class="imesw"><input type="checkbox" id="imeOn" checked> 옛한글 자판</label>
-        <span class="lab">첫소리</span><span id="okL"></span>
-        <span class="lab">가운뎃소리</span><span id="okV"></span>
-        <span class="lab">끝소리</span><span id="okT"></span>
-        <p class="help" id="imeWarn" hidden><b>한/영 키를 눌러 영문 상태로 바꿔 주세요.</b> 옛한글 자판은 영문 상태에서 두벌식 자리로 입력합니다.</p>
-        <p class="help" id="imeHelp">두벌식 그대로 치면 됩니다(키보드는 <b>영문 상태</b>로). <b>ㅏ 두 번</b> → ᆞ, ᆞ 다음 ㅏ → ᆢ, ᆞ 다음 ㅣ → ᆡ / <b>Shift+ㅁ</b> ㅿ, <b>Shift+ㅇ</b> ㆁ, <b>Shift+ㅎ</b> ㆆ / 받침 없는 자음 이어 치기: ㅂ+ㅇ → ㅸ, ㅅ+ㄱ → ㅺ, ㅅ+ㄷ → ㅼ, ㅅ+ㅂ → ㅽ, ㅂ+ㅅ → ㅄ, ㅂ+ㄷ → ㅳ, ㅂ+ㅅ+ㄱ → ㅴ. 받침으로 ㆁ·ㅿ·ㆆ과 ㄹ+ㆆ도 됩니다. Backspace는 자모 하나씩 지웁니다.</p>
-        <p class="help">비슷한 현대 글자를 먼저 치고 단추를 누르면 바로 앞 글자가 바뀝니다. 예: 하 → <b>ᆞ</b> → ᄒᆞ, 사 → <b>ᄯ</b> → ᄯᅡ. 글자 뒤에서 <kbd>`</kbd>(숫자 1 왼쪽)를 누르면 모음이 ᆞ로, 한 번 더 누르면 ᆢ로 바뀝니다.</p>
+        <p class="help" id="imeHelp">한/영 상태와 상관없이 두벌식 자리 그대로 치면 됩니다. <b>ㅏ 두 번</b> → ᆞ, ᆞ 다음 ㅏ → ᆢ, ᆞ 다음 ㅣ → ᆡ / <b>Shift+ㅁ</b> ㅿ, <b>Shift+ㅇ</b> ㆁ, <b>Shift+ㅎ</b> ㆆ / 받침 없는 자음 이어 치기: ㅂ+ㅇ → ㅸ, ㅅ+ㄱ → ㅺ, ㅅ+ㄷ → ㅼ, ㅅ+ㅂ → ㅽ, ㅂ+ㅅ → ㅄ, ㅂ+ㄷ → ㅳ, ㅂ+ㅅ+ㄱ → ㅴ. 받침으로 ㆁ·ㅿ·ㆆ과 ㄹ+ㆆ도 됩니다. 읽을 수 없는 글자는 <kbd>`</kbd>(숫자 1 왼쪽)로 □를 넣습니다. Backspace는 자모 하나씩 지우고, Enter는 다음 행으로 갑니다.</p>
       </div>
+      <input type="password" id="kbd" class="kbd" autocomplete="off" data-lpignore="true" data-1p-ignore aria-label="판독문 입력" tabindex="-1">
       <div id="textBody"></div>
     </div>
   </section>
@@ -437,60 +443,20 @@ function renderCurrent(partial){
 function lineItem(P,k){
   const L=P.lines[k]; const li=document.createElement('li'); li.dataset.k=k; if (L.text!==L.orig) li.classList.add('edited');
   const no=document.createElement('span'); no.className='no'; no.textContent=k+1; no.title=(k+1)+'행 틀 보기';
-  const tx=document.createElement('span'); tx.className='tx'; tx.contentEditable='true'; tx.spellcheck=false; tx.textContent=L.text;
+  const tx=document.createElement('span'); tx.className='tx'; tx.spellcheck=false; tx.textContent=L.text;
   tx.setAttribute('aria-label',(k+1)+'행');
-  tx.addEventListener('focus',()=>select(k,false));
-  tx.addEventListener('input',()=>{ L.text=tx.textContent.replace(/\n/g,'').replace(/\u00a0/g,' '); li.classList.toggle('edited', L.text!==L.orig); renderEditInfo(); });
-  tx.addEventListener('beforeinput',e=>{ if (e.inputType==='insertText' && e.data==='`'){ e.preventDefault(); oldVowel(tx); } });
-  tx.addEventListener('focus',()=>{ curTx=tx; $('oldk').hidden=false; });
-  tx.addEventListener('keydown',e=>imeKeydown(e,tx));
-  tx.addEventListener('mousedown',()=>imeCommit()); tx.addEventListener('blur',()=>imeCommit());
-  tx.addEventListener('keydown',e=>{ if (e.key==='Enter'){ e.preventDefault(); const nx=li.nextElementSibling; if (nx) nx.querySelector('.tx').focus(); } });
+  li.append(no,tx); bindLine(tx);
   no.addEventListener('click',()=>select(k,true));
-  li.append(no,tx); return li;
-}
-// ---------- 옛한글 입력 ----------
-let curTx=null;
-const OK={L:['ᄭ','ᄯ','ᄲ','ᄶ','ᄡ','ᄧ','ᄩ','ᄠ','ᄢ','ᅀ','ᅌ','ᅙ','ᄫ'],V:['ᆞ','ᆢ'],T:['ᇰ','ᇫ','ᇹ','ᆪ','ᆰ','ᆱ','ᆲ','ᇝ','ᇙ','ᇧ']};
-const isL=c=>(c>='\u1100'&&c<='\u115F')||(c>='\uA960'&&c<='\uA97F'), isV=c=>(c>='\u1160'&&c<='\u11A7')||(c>='\uD7B0'&&c<='\uD7C6'), isT=c=>(c>='\u11A8'&&c<='\u11FF')||(c>='\uD7CB'&&c<='\uD7FB');
-function caretIn(tx){
-  const sel=getSelection(); if (!sel.rangeCount) return null; const r=sel.getRangeAt(0);
-  if (!tx.contains(r.startContainer)) return null;
-  const pre=document.createRange(); pre.selectNodeContents(tx); pre.setEnd(r.startContainer,r.startOffset);
-  return pre.toString().length;
-}
-function setCaret(tx,pos){
-  tx.normalize(); let node=tx.firstChild; if (!node){ node=document.createTextNode(''); tx.appendChild(node); }
-  const r=document.createRange(); r.setStart(node,Math.min(pos,node.length)); r.collapse(true); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
-}
-function lastGrapheme(str){ try { const g=[...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(str)]; return g.length?g[g.length-1].segment:''; } catch(e){ return str.slice(-1); } }
-function editPrev(tx, fn){
-  if (!tx) return; const text=tx.textContent; let pos=caretIn(tx); if (pos===null) pos=text.length;
-  const before=text.slice(0,pos), after=text.slice(pos), g=lastGrapheme(before);
-  const parts=[...g.normalize('NFD')]; let L=parts.filter(isL).join(''), V=parts.filter(isV).join(''), T=parts.filter(isT).join('');
-  let rep=fn(L,V,T,g);
-  if (rep===null) return;
-  rep=rep.normalize('NFC'); const head=before.slice(0,before.length-g.length)+rep;
-  tx.textContent=head+after; setCaret(tx,head.length); tx.dispatchEvent(new Event('input'));
-}
-function oldVowel(tx){ editPrev(tx,(L,V,T,g)=> L ? L+(V==='ᆞ'?'ᆢ':'ᆞ')+T : g+'ᆞ'); }
-function okPress(kind,j){
-  const tx=curTx; if (!tx) return; tx.focus();
-  editPrev(tx,(L,V,T,g)=>{
-    if (!L) return g+j;                       // 앞이 한글이 아니면 그대로 넣기
-    if (kind==='L') return j+(V||'')+T;
-    if (kind==='V') return L+j+T;
-    return L+(V||'ᆞ')+j;                     // 끝소리
-  });
-}
-$('imeOn').addEventListener('change',e=>imeToggle(e.target.checked)); setTimeout(()=>imeToggle(IME.on),0);
-for (const k of ['L','V','T']) for (const j of OK[k]){
-  const b=document.createElement('button'); b.type='button'; b.textContent=j; b.title=(k==='L'?'첫소리 ':k==='V'?'가운뎃소리 ':'끝소리 ')+j;
-  b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',()=>okPress(k,j)); $('ok'+k).appendChild(b);
+  return li;
 }
 // ---------- 옛한글 자판 (두벌식 + 옛글자 규칙) ----------
+// 한/영 상태와 상관없이 치게 하려고, 키 입력은 화면 밖의 password 칸(브라우저가 한글 입력기를 끄는 칸)으로 받고
+// 행 글자와 커서는 직접 그린다. 자판을 끄면 행이 보통 편집 칸(contenteditable)으로 돌아간다.
 const IME={on:true, comp:null, tx:null, pos0:0, len:0, hist:[]};
+const ED={tx:null, pos:0, anc:0, drag:false, undo:new Map()};
+const COARSE = matchMedia('(pointer:coarse)').matches && !matchMedia('(any-pointer:fine)').matches;
 try { const v=localStorage.getItem('oldIME'); if (v!==null) IME.on=v==='1'; } catch(e){}
+if (COARSE) IME.on=false;   // 화면 자판만 있는 기기에서는 기기 자판을 그대로 쓴다
 const KM={KeyQ:['ㅂ','ㅃ'],KeyW:['ㅈ','ㅉ'],KeyE:['ㄷ','ㄸ'],KeyR:['ㄱ','ㄲ'],KeyT:['ㅅ','ㅆ'],KeyY:['ㅛ','ㅛ'],KeyU:['ㅕ','ㅕ'],KeyI:['ㅑ','ㅑ'],KeyO:['ㅐ','ㅒ'],KeyP:['ㅔ','ㅖ'],
   KeyA:['ㅁ','ㅿ'],KeyS:['ㄴ','ㄴ'],KeyD:['ㅇ','ㆁ'],KeyF:['ㄹ','ㄹ'],KeyG:['ㅎ','ㆆ'],KeyH:['ㅗ','ㅗ'],KeyJ:['ㅓ','ㅓ'],KeyK:['ㅏ','ㆍ'],KeyL:['ㅣ','ㅣ'],
   KeyZ:['ㅋ','ㅋ'],KeyX:['ㅌ','ㅌ'],KeyC:['ㅊ','ㅊ'],KeyV:['ㅍ','ㅍ'],KeyB:['ㅠ','ㅠ'],KeyN:['ㅜ','ㅜ'],KeyM:['ㅡ','ㅡ']};
@@ -502,6 +468,56 @@ const TOF={'ㄱ':'ᆨ','ㄲ':'ᆩ','ㄴ':'ᆫ','ㄷ':'ᆮ','ㄹ':'ᆯ','ㅁ':'�
 const VOF={'ㅏ':'ᅡ','ㅐ':'ᅢ','ㅑ':'ᅣ','ㅒ':'ᅤ','ㅓ':'ᅥ','ㅔ':'ᅦ','ㅕ':'ᅧ','ㅖ':'ᅨ','ㅗ':'ᅩ','ㅛ':'ᅭ','ㅜ':'ᅮ','ㅠ':'ᅲ','ㅡ':'ᅳ','ㅣ':'ᅵ','ㆍ':'ᆞ'};
 const VCOMB={'ᅩᅡ':'ᅪ','ᅩᅢ':'ᅫ','ᅩᅵ':'ᅬ','ᅮᅥ':'ᅯ','ᅮᅦ':'ᅰ','ᅮᅵ':'ᅱ','ᅳᅵ':'ᅴ','ᅡᅡ':'ᆞ','ᆞᅡ':'ᆢ','ᆞᆞ':'ᆢ','ᆞᅵ':'ᆡ'};
 const VDISP={'ᅡ':'ㅏ','ᅢ':'ㅐ','ᅣ':'ㅑ','ᅤ':'ㅒ','ᅥ':'ㅓ','ᅦ':'ㅔ','ᅧ':'ㅕ','ᅨ':'ㅖ','ᅩ':'ㅗ','ᅪ':'ㅘ','ᅫ':'ㅙ','ᅬ':'ㅚ','ᅭ':'ㅛ','ᅮ':'ㅜ','ᅯ':'ㅝ','ᅰ':'ㅞ','ᅱ':'ㅟ','ᅲ':'ㅠ','ᅳ':'ㅡ','ᅴ':'ㅢ','ᅵ':'ㅣ','ᆞ':'ㆍ','ᆡ':'ㆎ'};
+
+// --- 행 글자 읽고 쓰기 (자판 켬: 직접 그림 / 자판 끔: contenteditable) ---
+const lineOf=tx=>state.pages[state.cur].lines[+tx.closest('li').dataset.k];
+function getT(tx){ return IME.on ? lineOf(tx).text : tx.textContent; }
+function setT(tx,v,pos){
+  if (IME.on){ const L=lineOf(tx); pushUndo(tx,L.text); L.text=v; ED.tx=tx; ED.pos=ED.anc=pos; paint(tx); lineChanged(tx); }
+  else { tx.textContent=v; setCaretCE(tx,pos); tx.dispatchEvent(new Event('input')); }
+}
+function lineChanged(tx){ const L=lineOf(tx); tx.closest('li').classList.toggle('edited', L.text!==L.orig); renderEditInfo(); }
+function pushUndo(tx,old){ const k=tx.closest('li').dataset.k+'/'+state.cur; const st=ED.undo.get(k)||[]; if (st[st.length-1]!==old){ st.push(old); if (st.length>200) st.shift(); } ED.undo.set(k,st); }
+function caretIn(tx){ return IME.on ? (ED.tx===tx ? ED.pos : null) : caretInCE(tx); }
+function setCaret(tx,pos){ if (IME.on){ ED.tx=tx; ED.pos=ED.anc=pos; paint(tx); } else setCaretCE(tx,pos); }
+function caretInCE(tx){
+  const sel=getSelection(); if (!sel.rangeCount) return null; const r=sel.getRangeAt(0);
+  if (!tx.contains(r.startContainer)) return null;
+  const pre=document.createRange(); pre.selectNodeContents(tx); pre.setEnd(r.startContainer,r.startOffset);
+  return pre.toString().length;
+}
+function setCaretCE(tx,pos){
+  tx.normalize(); let node=tx.firstChild; if (!node){ node=document.createTextNode(''); tx.appendChild(node); }
+  const r=document.createRange(); r.setStart(node,Math.min(pos,node.length)); r.collapse(true); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+// 행을 그린다: [앞][고른 부분][커서][뒤]. 조각마다 data-o에 시작 위치를 적어 마우스 위치를 글자 위치로 바꾼다.
+function paint(tx){
+  const t=lineOf(tx).text, on=ED.tx===tx && document.activeElement===$('kbd');
+  tx.textContent='';
+  const a=on?Math.min(ED.pos,ED.anc):t.length, b=on?Math.max(ED.pos,ED.anc):t.length;
+  const seg=(s,o,cls)=>{ const e=document.createElement('span'); e.textContent=s; e.dataset.o=o; if (cls) e.className=cls; tx.appendChild(e); };
+  const cut=[[0,a,''],[a,b,'sel']], rest=[b,t.length,''];
+  for (const [s,e,c] of cut) if (e>s) seg(t.slice(s,e),s,c);
+  if (on){ const c=document.createElement('span'); c.className='caret'+(IME.comp?' comp':''); c.setAttribute('aria-hidden','true');
+    if (ED.pos===a) tx.insertBefore(c, tx.querySelector('.sel')); else tx.appendChild(c); }
+  if (rest[1]>rest[0]) seg(t.slice(rest[0]),rest[0],'');
+  if (on && IME.comp){ const s=IME.pos0, e=IME.pos0+IME.len; tx.querySelectorAll('span[data-o]').forEach(x=>{ const o=+x.dataset.o; if (o<e && o+x.textContent.length>s) x.classList.add('compseg'); }); }
+}
+function posFromPoint(tx,x,y){
+  let node=null, off=0;
+  if (document.caretPositionFromPoint){ const p=document.caretPositionFromPoint(x,y); if (p){ node=p.offsetNode; off=p.offset; } }
+  else if (document.caretRangeFromPoint){ const r=document.caretRangeFromPoint(x,y); if (r){ node=r.startContainer; off=r.startOffset; } }
+  const t=lineOf(tx).text;
+  if (!node || !tx.contains(node)) { const r=tx.getBoundingClientRect(); const vert=getComputedStyle(tx).writingMode.startsWith('vertical'); return (vert ? y<r.top+r.height/2 : x<r.left+r.width/2) ? 0 : t.length; }
+  const el=node.nodeType===3?node.parentElement:node; if (el.dataset && el.dataset.o!==undefined) return snap(t, +el.dataset.o + (node.nodeType===3?off:0));
+  return t.length;
+}
+const SEG=(()=>{ try { return new Intl.Segmenter('ko',{granularity:'grapheme'}); } catch(e){ return null; } })();
+function bounds(t){ const b=[0]; if (SEG){ for (const s of SEG.segment(t)) b.push(s.index+s.segment.length); } else for (let i=1;i<=t.length;i++) b.push(i); return b; }
+function snap(t,p){ const b=bounds(t); let best=0; for (const x of b) if (Math.abs(x-p)<Math.abs(best-p)) best=x; return best; }
+function stepG(t,p,d){ const b=bounds(t); if (d<0){ let r=0; for (const x of b) if (x<p) r=x; return r; } for (const x of b) if (x>p) return x; return t.length; }
+
+// --- 두벌식 조합 ---
 function imeRender(c){
   if (!c) return '';
   const L=c.L?LOF[c.L]:'', T=c.T?TOF[c.T]:'';
@@ -510,15 +526,15 @@ function imeRender(c){
   return VDISP[c.V] || ('ᅟ'+c.V);
 }
 function imeDraw(){
-  const tx=IME.tx; if (!tx) return; const t=tx.textContent, r=imeRender(IME.comp);
-  tx.textContent=t.slice(0,IME.pos0)+r+t.slice(IME.pos0+IME.len); IME.len=r.length; setCaret(tx,IME.pos0+r.length); tx.dispatchEvent(new Event('input'));
+  const tx=IME.tx; if (!tx) return; const t=getT(tx), r=imeRender(IME.comp);
+  const v=t.slice(0,IME.pos0)+r+t.slice(IME.pos0+IME.len); IME.len=r.length; setT(tx,v,IME.pos0+r.length);
 }
-function imeCommit(){ IME.comp=null; IME.hist=[]; IME.len=0; }
+function imeCommit(){ const had=!!IME.comp; IME.comp=null; IME.hist=[]; IME.len=0; if (had && IME.on && ED.tx) paint(ED.tx); }
 function imeStart(tx,c){
-  imeCommit(); IME.tx=tx; let p=caretIn(tx); if (p===null) p=tx.textContent.length; IME.pos0=p; IME.len=0; IME.comp=c; IME.hist=[]; imeDraw();
+  imeCommit(); IME.tx=tx; let p=caretIn(tx); if (p===null) p=getT(tx).length; IME.pos0=p; IME.len=0; IME.comp=c; IME.hist=[]; imeDraw();
 }
 function imePush(c){ IME.hist.push(IME.comp); IME.comp=c; imeDraw(); }
-function imeNext(c){ const tx=IME.tx; IME.pos0+=IME.len; IME.len=0; IME.comp=c; IME.hist=[]; imeDraw(); }
+function imeNext(c){ IME.pos0+=IME.len; IME.len=0; IME.comp=c; IME.hist=[]; imeDraw(); }
 function imeKey(tx,s){
   const c=IME.comp && IME.tx===tx ? IME.comp : null; const isC=CONS.includes(s);
   if (!c){ imeStart(tx, isC?{L:s}:{V:VOF[s]}); return; }
@@ -540,21 +556,90 @@ function imeBack(){
   else { IME.comp=null; imeDraw(); imeCommit(); }
   return true;
 }
-function imeKeydown(e, tx){
-  if (!IME.on || e.ctrlKey || e.altKey || e.metaKey) { imeCommit(); return; }
-  if (e.key==='Process' || e.isComposing){ $('imeWarn').hidden=false; return; }
-  const m=KM[e.code];
-  if (m){ e.preventDefault(); $('imeWarn').hidden=true; imeKey(tx, m[e.shiftKey?1:0]); return; }
-  if (e.key==='Backspace'){ if (imeBack()) e.preventDefault(); return; }
-  if (e.key.length===1 || ['Enter','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete','Escape'].includes(e.key)) imeCommit();
-}
-function imeToggle(on){ IME.on=on; imeCommit(); try{ localStorage.setItem('oldIME',on?'1':'0'); }catch(e){} $('imeOn').checked=on; $('imeHelp').hidden=!on; $('imeWarn').hidden=true; }
 
+// --- 편집 동작 (자판 켬) ---
+function delSel(){ const tx=ED.tx, t=getT(tx), a=Math.min(ED.pos,ED.anc), b=Math.max(ED.pos,ED.anc); if (a===b) return false; setT(tx,t.slice(0,a)+t.slice(b),a); return true; }
+function insertText(s){ const tx=ED.tx; if (!tx) return; imeCommit(); delSel(); s=s.replace(/[\r\n\t]+/g,'').normalize('NFC'); const t=getT(tx), p=ED.pos; setT(tx,t.slice(0,p)+s+t.slice(p),p+s.length); }
+function selText(){ const t=getT(ED.tx), a=Math.min(ED.pos,ED.anc), b=Math.max(ED.pos,ED.anc); return t.slice(a,b); }
+function focusLine(tx,pos){
+  if (!tx) return; imeCommit(); const old=ED.tx; ED.tx=tx; const t=getT(tx); ED.pos=ED.anc=Math.max(0,Math.min(pos===undefined?t.length:pos,t.length));
+  const k=+tx.closest('li').dataset.k; if (active!==k) select(k,false);
+  const kb=$('kbd'); if (document.activeElement!==kb) kb.focus({preventScroll:true});
+  if (old && old!==tx && old.isConnected) paint(old); paint(tx); $('oldk').hidden=false;
+}
+function moveTo(p,ext){ imeCommit(); ED.pos=p; if (!ext) ED.anc=p; paint(ED.tx); }
+function kbdKeydown(e){
+  const tx=ED.tx; if (!tx || !tx.isConnected) return;
+  const t=getT(tx), mod=e.ctrlKey||e.metaKey;
+  if (mod){
+    const k=e.key.toLowerCase();
+    if (k==='a'){ e.preventDefault(); imeCommit(); ED.anc=0; ED.pos=t.length; paint(tx); }
+    else if (k==='z'){ e.preventDefault(); imeCommit(); const key=tx.closest('li').dataset.k+'/'+state.cur, st=ED.undo.get(key)||[]; if (st.length){ const L=lineOf(tx); L.text=st.pop(); ED.pos=ED.anc=Math.min(ED.pos,L.text.length); paint(tx); lineChanged(tx); } }
+    return;   // 복사·잘라내기·붙여넣기는 copy/cut/paste 이벤트로
+  }
+  if (e.altKey) return;
+  const m=KM[e.code];
+  if (m && e.key!=='Process'){ e.preventDefault(); if (ED.pos!==ED.anc){ imeCommit(); delSel(); } imeKey(tx, m[e.shiftKey?1:0]); return; }
+  switch (e.key){
+    case 'Backspace': e.preventDefault(); if (imeBack()) return; if (delSel()) return; if (ED.pos>0) setT(tx,t.slice(0,ED.pos-1)+t.slice(ED.pos),ED.pos-1); return;
+    case 'Delete': e.preventDefault(); imeCommit(); if (delSel()) return; if (ED.pos<t.length) setT(tx,t.slice(0,ED.pos)+t.slice(ED.pos+1),ED.pos); return;
+    case 'ArrowLeft': case 'ArrowRight': {
+      e.preventDefault(); const vert=getComputedStyle(tx).writingMode.startsWith('vertical');
+      if (vert){ const li=tx.closest('li'), nx=e.key==='ArrowLeft'?li.nextElementSibling:li.previousElementSibling; if (nx) focusLine(nx.querySelector('.tx'),Math.min(ED.pos,lineOf(nx.querySelector('.tx')).text.length)); return; }
+      if (!e.shiftKey && ED.pos!==ED.anc){ moveTo(e.key==='ArrowLeft'?Math.min(ED.pos,ED.anc):Math.max(ED.pos,ED.anc)); return; }
+      moveTo(stepG(t,ED.pos,e.key==='ArrowLeft'?-1:1), e.shiftKey); return; }
+    case 'ArrowUp': case 'ArrowDown': {
+      e.preventDefault(); const vert=getComputedStyle(tx).writingMode.startsWith('vertical');
+      if (vert){ moveTo(stepG(t,ED.pos,e.key==='ArrowUp'?-1:1), e.shiftKey); return; }
+      const li=tx.closest('li'), nx=e.key==='ArrowUp'?li.previousElementSibling:li.nextElementSibling; if (nx) focusLine(nx.querySelector('.tx'),ED.pos); return; }
+    case 'Home': e.preventDefault(); moveTo(0,e.shiftKey); return;
+    case 'End': e.preventDefault(); moveTo(t.length,e.shiftKey); return;
+    case 'Enter': { e.preventDefault(); const nx=tx.closest('li').nextElementSibling; if (nx) focusLine(nx.querySelector('.tx'),0); else imeCommit(); return; }
+    case 'Escape': e.preventDefault(); $('kbd').blur(); return;
+    case 'Tab': imeCommit(); return;
+  }
+  if (e.key==='`'){ e.preventDefault(); insertText('□'); return; }
+  if (e.key.length===1){ e.preventDefault(); insertText(e.key); return; }
+}
+function imeToggle(on){
+  IME.on=on; imeCommit(); try{ localStorage.setItem('oldIME',on?'1':'0'); }catch(e){}
+  $('imeOn').checked=on; $('imeHelp').hidden=!on;
+  if (ED.tx && document.activeElement===$('kbd')) $('kbd').blur();
+  ED.tx=null; if (typeof renderCurrent==='function' && state.pages.length) renderCurrent();
+}
+function setupKbd(){
+  const kb=$('kbd');
+  kb.addEventListener('keydown',kbdKeydown);
+  kb.addEventListener('input',()=>{ if (kb.value){ const v=kb.value; kb.value=''; insertText(v); } });
+  kb.addEventListener('paste',e=>{ e.preventDefault(); insertText((e.clipboardData||window.clipboardData).getData('text')); });
+  kb.addEventListener('copy',e=>{ if (!ED.tx) return; e.preventDefault(); e.clipboardData.setData('text/plain',selText()); });
+  kb.addEventListener('cut',e=>{ if (!ED.tx) return; e.preventDefault(); e.clipboardData.setData('text/plain',selText()); imeCommit(); delSel(); });
+  kb.addEventListener('blur',()=>{ imeCommit(); const tx=ED.tx; setTimeout(()=>{ if (document.activeElement!==kb && tx && tx.isConnected){ paint(tx); } },0); });
+  document.addEventListener('mousemove',e=>{ if (ED.drag && ED.tx){ ED.pos=posFromPoint(ED.tx,e.clientX,e.clientY); paint(ED.tx); } });
+  document.addEventListener('mouseup',()=>{ ED.drag=false; });
+}
+// 행 하나를 편집할 수 있게 묶는다 (lineItem에서 부름)
+function bindLine(tx){
+  if (IME.on){
+    tx.contentEditable='false'; tx.tabIndex=0; tx.setAttribute('role','textbox'); paint(tx);
+    tx.addEventListener('mousedown',e=>{ if (e.button!==0) return; e.preventDefault(); const p=posFromPoint(tx,e.clientX,e.clientY);
+      if (e.shiftKey && ED.tx===tx){ ED.pos=p; paint(tx); } else focusLine(tx,p); ED.drag=true; ED.anc=e.shiftKey?ED.anc:p; ED.pos=p; paint(tx); });
+    tx.addEventListener('dblclick',e=>{ e.preventDefault(); ED.anc=0; ED.pos=getT(tx).length; paint(tx); });
+    tx.addEventListener('focus',()=>focusLine(tx));
+  } else {
+    tx.contentEditable='true'; tx.textContent=lineOf(tx).text;
+    tx.addEventListener('focus',()=>{ select(+tx.closest('li').dataset.k,false); $('oldk').hidden=false; });
+    tx.addEventListener('input',()=>{ const L=lineOf(tx); L.text=tx.textContent.replace(/\n/g,'').replace(/ /g,' '); lineChanged(tx); });
+    tx.addEventListener('keydown',e=>{ if (e.key==='Enter'){ e.preventDefault(); const nx=tx.closest('li').nextElementSibling; if (nx) nx.querySelector('.tx').focus(); } });
+  }
+}
+
+setupKbd(); $('imeOn').addEventListener('change',e=>imeToggle(e.target.checked)); $('imeOn').checked=IME.on; $('imeHelp').hidden=!IME.on;
 function select(k, scroll){
   active=k;
   document.querySelectorAll('.facs rect').forEach(r=>r.classList.toggle('on', +r.dataset.k===k));
   document.querySelectorAll('.lines li').forEach(li=>li.classList.toggle('on', +li.dataset.k===k));
-  if (scroll){ const li=document.querySelector(`.lines li[data-k="${k}"]`); if (li){ li.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'}); li.querySelector('.tx').focus({preventScroll:true}); } }
+  if (scroll){ const li=document.querySelector(`.lines li[data-k="${k}"]`); if (li){ li.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'}); const t=li.querySelector('.tx'); if (IME.on) focusLine(t); else t.focus({preventScroll:true}); } }
 }
 function renderEditInfo(){
   const n = state.pages.reduce((a,p)=>a+p.lines.filter(l=>l.text!==l.orig).length,0);

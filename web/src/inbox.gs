@@ -16,8 +16,11 @@ function out_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// 면별로 몇 번 받았는지 (판독기가 아직 덜 고쳐진 면을 고를 때 씀)
+function counts_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('cnt') || '{}'); } catch (e) { return {}; } }
 function doGet() {
-  return out_({ok: true, service: '방각본 판독기 학습 자료 창구'});
+  var c = counts_(), total = 0; for (var k in c) total += c[k];
+  return out_({ok: true, service: '방각본 판독기 학습 자료 창구', total: total, counts: c});
 }
 
 function doPost(e) {
@@ -35,6 +38,10 @@ function doPost(e) {
     var key = 'n_' + day, n = Number(props.getProperty(key) || 0);
     if (n >= MAX_PER_DAY) return out_({ok: false, error: 'daily_limit'});
     props.setProperty(key, String(n + 1));
+    try {   // 면별 받은 수 (속성 하나에 9KB까지라 이름은 짧게)
+      var ck = String(d.commons || d.src || '').replace(/^File:/, '').replace(/\.pdf$/i, '').slice(-24) + '|' + String(d.page || '');
+      var c = counts_(); c[ck] = (c[ck] || 0) + 1; props.setProperty('cnt', JSON.stringify(c));
+    } catch (x) {}
 
     var root = folder_(folder_(DriveApp.getRootFolder(), ROOT), BOX);
     var dir = folder_(root, day);

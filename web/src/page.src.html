@@ -49,6 +49,14 @@ button:focus-visible,.btn:focus-within,input:focus-visible,[contenteditable]:foc
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
 button:disabled{opacity:.5;cursor:default}
 /* 입력 띠 */
+.teach{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:16px}
+.teach[hidden]{display:none}
+.teach>div:first-child{flex:1 1 420px;min-width:0}
+.teach h2{font-size:1.05rem;margin:0 0 6px}
+.teach p{margin:0 0 4px;max-width:80ch;font-size:.9rem}
+.teach .how{color:var(--muted);font-size:.82rem}
+.teach .go{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.teach .count{font-size:.8rem;color:var(--muted)}
 .intake{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
 .drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;min-height:84px;background:var(--bg)}
 .drop.over{border-color:var(--accent);background:var(--accent-soft)}
@@ -152,6 +160,18 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <p class="by">만든 사람 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> · 성균관대학교 국어국문학과 BK 교육연구단</p>
   </header>
 
+  <section class="teach" id="teach" hidden aria-label="판독기 함께 가르치기">
+    <div>
+      <h2>판독기를 함께 가르쳐 주세요</h2>
+      <p>단추를 누르면 위키미디어 공용에 공개된 국립중앙도서관 소장 방각본 가운데 한 면을 골라 판독기가 읽어 둡니다. 틀린 글자를 고친 뒤 <b>학습용으로 보내기</b>를 눌러 주세요. 사람이 고친 면이 모일수록 판독기가 정확해집니다.</p>
+      <p class="how">원문 표기 그대로, 띄어쓰기 없이, 판본 한 행을 한 줄로 고칩니다. 읽을 수 없는 글자는 <kbd>`</kbd> 키로 □를 넣습니다.</p>
+    </div>
+    <div class="go">
+      <button class="primary" id="randomPage" type="button">고칠 면 하나 받기</button>
+      <span class="count" id="teachCount"></span>
+    </div>
+  </section>
+
   <section class="intake" aria-label="판독할 자료">
     <label class="drop" id="drop" for="file">
       <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp">
@@ -169,7 +189,6 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <button class="primary" id="go" disabled>판독 시작</button>
       <button id="stop" hidden>멈추기</button>
       <button id="trySample" type="button">예시 면으로 해 보기</button>
-      <button id="randomPage" type="button" hidden title="위키미디어 공용에 공개된 방각본 가운데 한 면을 골라 읽습니다">아무 면이나 읽고 고치기</button>
     </div>
     <div class="status">
       <div class="msg" id="msg" role="status">예시 면을 보여 드리고 있습니다. 자료를 고르면 판독을 시작할 수 있습니다.</div>
@@ -254,7 +273,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 const CFG = {
   model: ['model_v7_0.wasm','model_v7_1.wasm','model_v7_2.wasm','model_v7_3.wasm'], modelLabel: '7차 모델',
   lm: 'lm7.gz.wasm', charset: 'charset_v7.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
-  approxMB: 47, github: false, inbox: '', issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
+  approxMB: 47, github: false, minConf: 0.85, inbox: '', issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
@@ -377,6 +396,7 @@ async function run(){
           const T=out.y.dims[1], C=out.y.dims[2]; const lp=KP.logSoftmax(out.y.data,T,C);
           const s = useLM ? KP.beam(lp,T,C,eng.cs,eng.LM) : KP.greedy(lp,T,C,eng.cs);
           P.lines.push({text:s, orig:s}); lineMs.push(performance.now()-tl);
+          { let sm=0, nn=0; for (let t=0;t<T;t++){ let m=-Infinity, k=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; k=c; } if (k){ sm+=Math.exp(m); nn++; } } (P.conf=P.conf||[]).push(nn?sm/nn:0); }
           const per = median(lineMs)/1000, remainPages = Math.max(0,(state.total||1)-done-1);
           setMsg(`${no}쪽 ${k+1}/${seg.cols.length}행 판독 중 · 남은 시간 약 ${fmtTime(per*((seg.cols.length-k-1)+remainPages*seg.cols.length))}`);
           setBar((done + (k+1)/seg.cols.length)/(state.total||1));
@@ -691,8 +711,8 @@ async function sendInbox(P){
     const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body});
     const j=await r.json();
     if (!j.ok) throw {code:j.error};
-    SENT.set(pageKey(P), doc); renderPages();
-    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개. 고맙습니다.`);
+    SENT.set(pageKey(P), doc); renderPages(); loadCounts();
+    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='daily_limit') setMsg('오늘 받을 수 있는 분량이 찼습니다. 내일 다시 보내 주세요.', true);
@@ -800,8 +820,28 @@ async function openCommons(title,name,want){
   } catch(e){ setMsg('면을 가져오지 못했습니다. 잠시 뒤 다시 눌러 주세요.', true); }
   finally { btn.disabled=false; }
 }
-$('randomPage').onclick=()=>{ const [title,name]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)]; openCommons(title,name); };
-if (CFG.github && CFG.randomOn) $('randomPage').hidden=false;
+const GH_TITLE='File:CNTS-00109637790 금향졍긔 이종. 권하.pdf', GH_TEST=[34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,66];
+let COUNTS=null;
+async function loadCounts(){
+  try { const j=await (await fetch(CFG.inbox)).json(); COUNTS=j.counts||{}; $('teachCount').textContent = j.total ? `지금까지 모인 면 ${j.total}면` : '아직 모인 면이 없습니다. 첫 면을 고쳐 주세요.'; }
+  catch(e){ COUNTS={}; }
+}
+const ckey=(title,page)=>title.replace(/^File:/,'').replace(/\.pdf$/i,'').slice(-24)+'|'+page;
+function pickTarget(){
+  if (Math.random()<0.3){ const c=GH_TEST.map(p=>[p,(COUNTS||{})[ckey(GH_TITLE,p)]||0]); const m=Math.min(...c.map(x=>x[1])); const pool=c.filter(x=>x[1]===m); return [GH_TITLE,'금향졍긔 권하',pool[Math.floor(Math.random()*pool.length)][0]]; }
+  const [t,n]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)]; return [t,n,0];
+}
+$('randomPage').onclick=async()=>{
+  if (state.running) return; if (!COUNTS) await loadCounts();
+  for (let tries=0; tries<3; tries++){
+    const [t,n,p]=pickTarget(); await openCommons(t,n,p);
+    const P=state.pages[0], conf=P&&P.conf&&P.conf.length ? P.conf.reduce((a,b)=>a+b,0)/P.conf.length : 0;
+    if (P && P.status==='ok' && P.lines.length>=8 && conf>=CFG.minConf) return;
+    if (tries<2) setMsg('판독이 잘 안 되는 면이 걸려서 다른 면을 가져옵니다…');
+  }
+};
+if (CFG.github && CFG.inbox) loadCounts();
+if (CFG.github && CFG.inbox) $('teach').hidden=false;
 // 주소로 특정 면 열기: ?f=File:...pdf&p=쪽&n=이름
 (()=>{ if (!CFG.github) return; const q=new URLSearchParams(location.search), f=q.get('f'), pg=+q.get('p');
   if (f && /^File:[^\/]+\.pdf$/i.test(f) && pg>0) setTimeout(()=>openCommons(f, (q.get('n')||f.replace(/^File:|\.pdf$/gi,'')).slice(0,40), pg), 300); })();

@@ -129,6 +129,7 @@ button:disabled{opacity:.5;cursor:default}
 @media (prefers-reduced-motion:reduce){.tx .caret{animation:none}}
 .linetools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-start;padding:10px 14px 14px;border-top:1px dashed var(--line)}
 .linetools .note{flex:1 1 280px;display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
+.kk{display:inline-flex;align-items:center;gap:2px;margin:2px 8px 2px 0;white-space:nowrap}.kk kbd{font:inherit;font-size:.8rem;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--bg)}
 .linetools textarea{font:inherit;font-size:.88rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;resize:vertical;min-height:2.6em}
 .lines li.added .no{color:var(--accent)}
 .lines li .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:0 4px;grid-column:3}
@@ -223,7 +224,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       </div>
       <div class="oldk" id="oldk" hidden aria-label="옛한글 입력">
         <label class="imesw"><input type="checkbox" id="imeOn" checked> 옛한글 자판</label>
-        <p class="help" id="imeHelp">한/영 상태와 상관없이 두벌식 자리 그대로 치면 됩니다. <b>ㅏ 두 번</b> → ᆞ, ᆞ 다음 ㅏ → ᆢ, ᆞ 다음 ㅣ → ᆡ / <b>Shift+ㅁ</b> ㅿ, <b>Shift+ㅇ</b> ㆁ, <b>Shift+ㅎ</b> ㆆ / 받침 없는 자음 이어 치기: ㅂ+ㅇ → ㅸ, ㅅ+ㄱ → ㅺ, ㅅ+ㄷ → ㅼ, ㅅ+ㅂ → ㅽ, ㅂ+ㅅ → ㅄ, ㅂ+ㄷ → ㅳ, ㅂ+ㅅ+ㄱ → ㅴ. 받침으로 ㆁ·ㅿ·ㆆ과 ㄹ+ㆆ도 됩니다. 읽을 수 없는 글자는 <kbd>`</kbd>(숫자 1 왼쪽)로 □를 넣습니다. Backspace는 자모 하나씩 지우고, Enter는 다음 행으로 갑니다.</p>
+        <p class="help" id="imeHelp">평소 두벌식대로 치면 됩니다. <span class="kk"><kbd>ㅏ</kbd><kbd>ㅏ</kbd> ᆞ</span> <span class="kk"><kbd>⇧ㅁ</kbd> ㅿ</span> <span class="kk"><kbd>⇧ㅇ</kbd> ㆁ</span> <span class="kk"><kbd>⇧ㅎ</kbd> ㆆ</span> <span class="kk"><kbd>ㅅ</kbd><kbd>ㄱ</kbd> ㅺ</span> <span class="kk"><kbd>`</kbd> □ 못 읽는 글자</span></p>
       </div>
       <input type="password" id="kbd" class="kbd" autocomplete="off" data-lpignore="true" data-1p-ignore aria-label="판독문 입력" tabindex="-1">
       <div id="textBody"></div>
@@ -1084,14 +1085,80 @@ drop.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));
 $('go').onclick=run;
 // ---------- 아무 면이나 읽고 고치기 (위키미디어 공용의 국립중앙도서관 소장 방각본) ----------
 const EXAMPLES=[
-  ['File:CNTS-00082399741 1 샤시남졍긔.pdf','사씨남정기 상'],['File:CNTS-00082399741 2 샤시남졍긔.pdf','사씨남정기 하'],
-  ['File:CNTS-00082399892 1 셔유긔.pdf','서유기 상'],['File:CNTS-00082399892 2 셔유긔.pdf','서유기 하'],
-  ['File:CNTS-00047982706 1 곽분양젼.pdf','곽분양전 상'],['File:CNTS-00082399731 2 곽분양젼.pdf','곽분양전 중'],['File:CNTS-00047982706 2 곽분양젼.pdf','곽분양전 하'],
-  ['File:CNTS-00082399889 1 삼국지.pdf','삼국지 1'],['File:CNTS-00082399889 2 삼국지.pdf','삼국지 2'],['File:CNTS-00082399889 3 삼국지.pdf','삼국지 3'],
-  ['File:심청전(1920).pdf','심청전'],['File:CNTS-00047982698 쌍쥬긔연.pdf','쌍주기연'],['File:CNTS-00060574838 옥쥬호연.pdf','옥주호연'],
-  ['File:CNTS-00047982704 장한졀효기.pdf','장한절효기'],['File:홍길동전.pdf','홍길동전'],['File:CNTS-00082399730 3 황운젼.pdf','황운전 3'],['File:CNTS-00082399730 1 황운젼.pdf','황운전 1'],
-  ['File:CNTS-00109637790 금향졍긔 이종. 권하.pdf','금향졍긔 권하'],['File:CNTS-00109637790 금향졍긔 이종. 권하.pdf','금향졍긔 권하'],
-  ['File:CNTS-00060574842 월봉긔. 일- -著者未詳-.pdf','월봉긔 1']];
+  ['File:CNTS-00047982700 장풍운젼.pdf', '장풍운전'],
+  ['File:CNTS-00047982702 구운몽.pdf', '구운몽'],
+  ['File:CNTS-00047982703 퇴별가.pdf', '퇴별가'],
+  ['File:CNTS-00047982705 숙영낭자젼.pdf', '숙영낭자전'],
+  ['File:CNTS-00047982707 열여춘향슈졀가.pdf', '열녀춘향수절가'],
+  ['File:CNTS-00047982709 양산 젼.pdf', '양산 젼'],
+  ['File:CNTS-00047982710 신미녹.pdf', '신미록'],
+  ['File:CNTS-00047982711 홍길동전.pdf', '홍길동전'],
+  ['File:CNTS-00047982712 1 월왕젼.pdf', '월왕전 1'],
+  ['File:CNTS-00047982712 2 월왕젼.pdf', '월왕전 2'],
+  ['File:CNTS-00047982712 3 월왕젼.pdf', '월왕전 3'],
+  ['File:CNTS-00047982713 당태죵젼.pdf', '당태종전'],
+  ['File:CNTS-00047982714 뎡슈졍전.pdf', '정수정전'],
+  ['File:CNTS-00047982715 진대방젼.pdf', '진대방전'],
+  ['File:CNTS-00047982716 임장군젼.pdf', '임장군전'],
+  ['File:CNTS-00047982717 금방울전.pdf', '금방울전'],
+  ['File:CNTS-00047982718 양풍운젼.pdf', '양풍운전'],
+  ['File:CNTS-00047982719 남훈태평가.pdf', '남훈태평가'],
+  ['File:CNTS-00047982720 흥부전.pdf', '흥부전'],
+  ['File:CNTS-00047982721 됴웅전.pdf', '조웅전'],
+  ['File:CNTS-00047982722 양풍뎡.pdf', '양풍전'],
+  ['File:CNTS-00047982723 쇼대성젼.pdf', '소대성전'],
+  ['File:CNTS-00047982724 젹성의전.pdf', '적성의전'],
+  ['File:CNTS-00047982726 1 슉향전. 中, 下.pdf', '숙향전 중'],
+  ['File:CNTS-00047982726 2 슉향전. 中, 下.pdf', '숙향전 하'],
+  ['File:CNTS-00047993839 됴웅젼.pdf', '조웅전'],
+  ['File:CNTS-00047993840 됴웅젼.pdf', '조웅전'],
+  ['File:CNTS-00047993841 됴웅젼.pdf', '조웅전'],
+  ['File:CNTS-00047993845 홍길동젼.pdf', '홍길동전'],
+  ['File:CNTS-00047993847 심쳥젼.pdf', '심청전'],
+  ['File:CNTS-00047993849 심쳥젼.pdf', '심청전'],
+  ['File:CNTS-00047993851 장풍운젼.pdf', '장풍운전'],
+  ['File:CNTS-00047993855 님쟝군젼.pdf', '임장군전'],
+  ['File:CNTS-00047993856 님쟝군젼단.pdf', '임장군전'],
+  ['File:CNTS-00060574834 슈호지=水滸志. 卷2.pdf', '수호지 권2'],
+  ['File:CNTS-00082399725 1 월봉긔.pdf', '월봉기 1'],
+  ['File:CNTS-00082399725 2 월봉긔.pdf', '월봉기 2'],
+  ['File:CNTS-00082399725 3 월봉긔.pdf', '월봉기 3'],
+  ['File:CNTS-00082399726 1 슉향젼.pdf', '숙향전 1'],
+  ['File:CNTS-00082399726 2 슉향젼.pdf', '숙향전 2'],
+  ['File:CNTS-00082399726 3 슉향젼.pdf', '숙향전 3'],
+  ['File:CNTS-00082399727 1 샤시남졍긔.pdf', '사씨남정기 1'],
+  ['File:CNTS-00082399727 2 샤시남졍긔.pdf', '사씨남정기 2'],
+  ['File:CNTS-00082399727 3 샤시남졍긔.pdf', '사씨남정기 3'],
+  ['File:CNTS-00082399737 1 월봉긔.pdf', '월봉기 1'],
+  ['File:CNTS-00082399737 2 월봉긔.pdf', '월봉기 2'],
+  ['File:CNTS-00082399742 1 슈호지.pdf', '수호지 1'],
+  ['File:CNTS-00082399742 2 슈호지.pdf', '수호지 2'],
+  ['File:CNTS-00082399743 1 남졍팔난긔.pdf', '남정팔난기 1'],
+  ['File:CNTS-00082399743 2 남졍팔난긔.pdf', '남정팔난기 2'],
+  ['File:CNTS-00082399744 1 김홍젼.pdf', '김홍전 1'],
+  ['File:CNTS-00082399744 2 김홍젼.pdf', '김홍전 2'],
+  ['File:CNTS-00082399745 1 곽분양젼.pdf', '곽분양전 1'],
+  ['File:CNTS-00082399745 2 곽분양젼.pdf', '곽분양전 2'],
+  ['File:CNTS-00082399746 1 월왕젼.pdf', '월왕전 1'],
+  ['File:CNTS-00082399746 2 월왕젼.pdf', '월왕전 2'],
+  ['File:CNTS-00082399746 3 월왕젼.pdf', '월왕전 3'],
+  ['File:CNTS-00082399741 1 샤시남졍긔.pdf', '사씨남정기 상'],
+  ['File:CNTS-00082399741 2 샤시남졍긔.pdf', '사씨남정기 하'],
+  ['File:CNTS-00082399892 1 셔유긔.pdf', '서유기 상'],
+  ['File:CNTS-00082399892 2 셔유긔.pdf', '서유기 하'],
+  ['File:CNTS-00047982706 1 곽분양젼.pdf', '곽분양전 상'],
+  ['File:CNTS-00082399731 2 곽분양젼.pdf', '곽분양전 중'],
+  ['File:CNTS-00047982706 2 곽분양젼.pdf', '곽분양전 하'],
+  ['File:CNTS-00082399889 1 삼국지.pdf', '삼국지 1'],
+  ['File:CNTS-00082399889 2 삼국지.pdf', '삼국지 2'],
+  ['File:CNTS-00082399889 3 삼국지.pdf', '삼국지 3'],
+  ['File:CNTS-00047982698 쌍쥬긔연.pdf', '쌍주기연'],
+  ['File:CNTS-00060574838 옥쥬호연.pdf', '옥주호연'],
+  ['File:CNTS-00047982704 장한졀효기.pdf', '장한절효기'],
+  ['File:CNTS-00082399730 3 황운젼.pdf', '황운전 3'],
+  ['File:CNTS-00082399730 1 황운젼.pdf', '황운전 1'],
+  ['File:CNTS-00060574842 월봉긔. 일- -著者未詳-.pdf', '월봉기 1'],
+  ['File:홍길동전.pdf','홍길동전'],['File:심청전(1920).pdf','심청전']];
 async function commonsPage(title, want){
   const api=q=>fetch('https://commons.wikimedia.org/w/api.php?'+new URLSearchParams({...q,format:'json',origin:'*'})).then(r=>r.json());
   const j=await api({action:'query',titles:title,prop:'imageinfo',iiprop:'size|url',iiurlwidth:'500',iiurlparam:'page3-500px'});
@@ -1126,8 +1193,10 @@ async function loadCounts(){
 }
 const ckey=(title,page)=>title.replace(/^File:/,'').replace(/\.pdf$/i,'').slice(-24)+'|'+page;
 function pickTarget(){
-  if (Math.random()<0.5){ const c=GH_TEST.map(p=>[p,(COUNTS||{})[ckey(GH_TITLE,p)]||0]); const m=Math.min(...c.map(x=>x[1])); const pool=c.filter(x=>x[1]===m); return [GH_TITLE,'금향졍긔 권하',pool[Math.floor(Math.random()*pool.length)][0]]; }
-  const [t,n]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)]; return [t,n,0];
+  if (Math.random()<0.15){ const c=GH_TEST.map(p=>[p,(COUNTS||{})[ckey(GH_TITLE,p)]||0]); const m=Math.min(...c.map(x=>x[1])); const pool=c.filter(x=>x[1]===m); return [GH_TITLE,'금향졍긔 권하',pool[Math.floor(Math.random()*pool.length)][0]]; }
+  // 작품마다 같은 확률로 고른 뒤 그 작품의 책 하나를 고른다 (조웅전처럼 책이 많은 작품에 몰리지 않게)
+  const works=[...new Set(EXAMPLES.map(e=>e[1].replace(/ (\d+|상|중|하|권\d+)$/,'')))], w=works[Math.floor(Math.random()*works.length)];
+  const pool=EXAMPLES.filter(e=>e[1].replace(/ (\d+|상|중|하|권\d+)$/,'')===w); const [t,n]=pool[Math.floor(Math.random()*pool.length)]; return [t,n,0];
 }
 $('randomPage').onclick=async()=>{
   if (state.running) return; if (!COUNTS) await loadCounts();

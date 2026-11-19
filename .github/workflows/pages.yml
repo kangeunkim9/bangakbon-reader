@@ -23,6 +23,7 @@ jobs:
         run: |
           mkdir _site
           cp web/index.html web/contributors.html web/sample.jpg web/charset_v*.json web/model_v*_*.wasm web/ort-wasm-simd.wasm _site/
+          if [ -d web/pre ]; then cp -r web/pre _site/; fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -169,6 +169,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <button class="primary" id="go" disabled>판독 시작</button>
       <button id="stop" hidden>멈추기</button>
       <button id="trySample" type="button">예시 면으로 해 보기</button>
+      <button id="randomPage" type="button" hidden title="위키미디어 공용에 공개된 방각본 가운데 한 면을 골라 읽습니다">아무 면이나 읽고 고치기</button>
     </div>
     <div class="status">
       <div class="msg" id="msg" role="status">예시 면을 보여 드리고 있습니다. 자료를 고르면 판독을 시작할 수 있습니다.</div>
@@ -631,13 +632,13 @@ async function run(){
   const prevPages = state.pages, prevName = state.name;
   try {
     const eng = await loadEngine(useLM);
-    state.pages=[]; state.name=state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
+    state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
     const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
     for await (const [no,g] of pagesOf(state.file,a,b)){
       if (state.stop) break;
       setMsg(`${no}쪽 행 나누는 중…`); await idle();
       let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }
-      const P = {no, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
+      const P = {no: state.file.srcPage||no, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
       state.pages.push(P); const idx=state.pages.length-1;
       if (seg.cols.length<6){ P.status='empty'; P.cols=[]; }
       else {
@@ -958,7 +959,7 @@ $('trainBy').addEventListener('change',()=>{ try { localStorage.setItem('trainBy
 async function sendInbox(P){
   const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
   try {
-    const doc={src:state.name, page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
+    const doc={src:state.name, commons:state.commons||'', page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
       lines:trainLines(P), model:CFG.modelLabel, lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
     const body=JSON.stringify(Object.assign({image: await b64(P.full)}, doc));
     const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body});
@@ -980,7 +981,7 @@ async function sendIssue(){
   saveBlob(P.full, img);
   const text=P.lines.map(l=>l.text).join('\n'), n=P.lines.filter(l=>l.text!==l.orig).length;
   const q={template:'training.yml', title:`[학습 자료] ${state.name} ${P.no}쪽`, source:state.name, page:String(P.no),
-    meta:`${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''} / 고친 행 ${n}개 / 판독기 ${location.host}`, text};
+    meta:`${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''} / 고친 행 ${n}개 / 판독기 ${location.host}${state.commons?' / 위키미디어 공용 '+state.commons:''}`, text};
   let url=CFG.issues+'?'+new URLSearchParams(q).toString(), copied=false;
   if (url.length>7800){ delete q.text; url=CFG.issues+'?'+new URLSearchParams(q).toString(); try { await navigator.clipboard.writeText(text); copied=true; } catch(e){} }
   window.open(url,'_blank','noopener');
@@ -1030,13 +1031,51 @@ $('saveAll').onclick=async()=>{
 (async()=>{ try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch(e){ downloads=null; } $('saveAll').hidden=!(downloads||CFG.github); })();
 
 // ---------- 조작 ----------
-function pick(f){ if (!f) return; state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
+function pick(f){ if (!f) return; if (!f.srcPage) state.commons=''; state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
 $('file').addEventListener('change',e=>pick(e.target.files[0]));
 const drop=$('drop');
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));
 $('go').onclick=run;
+// ---------- 아무 면이나 읽고 고치기 (위키미디어 공용의 국립중앙도서관 소장 방각본) ----------
+const EXAMPLES=[
+  ['File:CNTS-00082399741 1 샤시남졍긔.pdf','사씨남정기 상'],['File:CNTS-00082399741 2 샤시남졍긔.pdf','사씨남정기 하'],
+  ['File:CNTS-00082399892 1 셔유긔.pdf','서유기 상'],['File:CNTS-00082399892 2 셔유긔.pdf','서유기 하'],
+  ['File:CNTS-00047982706 1 곽분양젼.pdf','곽분양전 상'],['File:CNTS-00082399731 2 곽분양젼.pdf','곽분양전 중'],['File:CNTS-00047982706 2 곽분양젼.pdf','곽분양전 하'],
+  ['File:CNTS-00082399889 1 삼국지.pdf','삼국지 1'],['File:CNTS-00082399889 2 삼국지.pdf','삼국지 2'],['File:CNTS-00082399889 3 삼국지.pdf','삼국지 3'],
+  ['File:심청전(1920).pdf','심청전'],['File:CNTS-00047982698 쌍쥬긔연.pdf','쌍주기연'],['File:CNTS-00060574838 옥쥬호연.pdf','옥주호연'],
+  ['File:CNTS-00047982704 장한졀효기.pdf','장한절효기'],['File:홍길동전.pdf','홍길동전'],['File:CNTS-00082399730 3 황운젼.pdf','황운전 3'],['File:CNTS-00082399730 1 황운젼.pdf','황운전 1'],
+  ['File:CNTS-00109637790 금향졍긔 이종. 권하.pdf','금향졍긔 권하'],['File:CNTS-00109637790 금향졍긔 이종. 권하.pdf','금향졍긔 권하'],
+  ['File:CNTS-00060574842 월봉긔. 일- -著者未詳-.pdf','월봉긔 1']];
+async function commonsPage(title){
+  const api=q=>fetch('https://commons.wikimedia.org/w/api.php?'+new URLSearchParams({...q,format:'json',origin:'*'})).then(r=>r.json());
+  const j=await api({action:'query',titles:title,prop:'imageinfo',iiprop:'size|url',iiurlwidth:'500',iiurlparam:'page3-500px'});
+  const ii=Object.values(j.query.pages)[0].imageinfo[0], n=ii.pagecount||1;
+  const page=3+Math.floor(Math.random()*Math.max(1,n-4));            // 표지와 끝 면은 빼고
+  const url=ii.thumburl.replace(/page\d+-\d+px/g,'page'+page+'-1920px');
+  const bm=await createImageBitmap(await (await fetch(url)).blob());
+  const s=Math.min(1,1500/bm.width), c=document.createElement('canvas'); c.width=Math.round(bm.width*s); c.height=Math.round(bm.height*s);
+  c.getContext('2d').drawImage(bm,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
+  return {blob, page, descr:ii.descriptionurl};
+}
+$('randomPage').onclick=async()=>{
+  if (state.running) return; const btn=$('randomPage'); btn.disabled=true;
+  try {
+    const [title,name]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)];
+    setMsg(`위키미디어 공용에서 ${name} 한 면을 가져오는 중…`);
+    const {blob,page,descr}=await commonsPage(title);
+    const f=new File([blob],`${name} ${page}쪽.jpg`,{type:'image/jpeg'}); f.srcPage=page; f.srcName=name;
+    state.commons=title; pick(f);
+    $('fname').innerHTML=''; const a=document.createElement('a'); a.href=descr; a.target='_blank'; a.rel='noopener'; a.textContent=`위키미디어 공용 · ${name} ${page}쪽 (국립중앙도서관 소장본)`; $('fname').appendChild(a);
+    await run();
+    if (state.pages.length && state.pages[0].status==='ok') setMsg(`${name} ${page}쪽을 읽었습니다. 틀린 글자를 고친 뒤 아래 '학습용으로 보내기'를 눌러 주세요.`);
+    else setMsg('본문이 없는 면이 걸렸습니다. 한 번 더 눌러 주세요.');
+  } catch(e){ setMsg('면을 가져오지 못했습니다. 잠시 뒤 다시 눌러 주세요.', true); }
+  finally { btn.disabled=false; }
+};
+if (CFG.github) $('randomPage').hidden=false;
 $('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
 $('vert').onclick=()=>{ state.vert=!state.vert; $('vert').setAttribute('aria-pressed',state.vert); $('vert').textContent=state.vert?'가로로 보기':'세로로 대조'; renderCurrent(); };
 

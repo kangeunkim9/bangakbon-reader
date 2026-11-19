@@ -331,7 +331,7 @@ async function loadEngine(needLM){
   return state.eng;
 }
 
-// 판독기를 컴퓨터 코어 수만큼(최대 4개) 워커로 띄워 행을 나눠 읽는다. 워커를 못 쓰면 한 개로 읽는다
+// 판독기를 컴퓨터 코어 수에 맞춰(최대 6개) 워커로 띄워 행을 나눠 읽는다. 워커를 못 쓰면 한 개로 읽는다
 const WORKER_SRC = `let sess;
 onmessage = async (e) => { const m = e.data;
   try {
@@ -343,7 +343,7 @@ onmessage = async (e) => { const m = e.data;
 };`;
 async function makeRunners(buf, cs){
   const qn = +new URLSearchParams(location.search).get('workers');   // 시험용: ?workers=N
-  const n = qn>0 ? Math.min(8,qn) : Math.max(1, Math.min(4, (navigator.hardwareConcurrency||2) - 1));
+  const n = qn>0 ? Math.min(8,qn) : Math.max(1, Math.min(6, Math.floor((navigator.hardwareConcurrency||2)*0.6)));   // 12코어 6개, 8코어 4개, 4코어 2개
   if (n>=2 && typeof Worker!=='undefined'){
     try {
       const ortUrl = (document.querySelector('script[src*="ort.wasm"]')||{}).src;

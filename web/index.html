@@ -721,7 +721,7 @@ async function run(){
           await idle();
         }
         // 가장자리에 새로 붙인 행이 글자가 아니면(테두리·얼룩) 뺀다
-        const junk=k=>P.lines[k] && ((P.conf[k]||0)<0.6 || KP.graphemes(P.lines[k].text).length<3);
+        const junk=k=>P.lines[k] && ((P.conf[k]||0)<0.6 || KP.graphemes(P.lines[k].text)<3);
         if (seg.edge && seg.edge.last && P.lines.length===P.cols.length && junk(P.lines.length-1)){ P.lines.pop(); P.cols.pop(); P.conf.pop(); }
         if (seg.edge && seg.edge.first && P.lines.length===P.cols.length && junk(0)){ P.lines.shift(); P.cols.shift(); P.conf.shift(); }
         if (P.lines.length && median(P.lines.map(l=>KP.graphemes(l.text)))<8) P.status='nomatch';
@@ -1192,7 +1192,7 @@ function lineShow(){
   const cv=$('lcCanvas'), x=cv.getContext('2d'); cv.width=w; cv.height=h;
   x.drawImage(LM.img, Math.max(0,a-3), P.t, w, h, 0, 0, w, h);
   // 세로로 쓰면 옛한글 자모가 풀려 보여서, 글자를 한 줄에 하나씩 가로로 쓰고 세로로 쌓는다. 사진과 판독문 글자 간격을 맞춘다
-  const n=Math.max(6,KP.graphemes(P.lines[k].text).length), dispH=Math.round(Math.max(n*40, Math.min(h*0.6, n*60))), step=dispH/n;
+  const n=Math.max(6,KP.graphemes(P.lines[k].text)), dispH=Math.round(Math.max(n*40, Math.min(h*0.6, n*60))), step=dispH/n;
   cv.style.height=dispH+'px'; const ls=$('lcList'); ls.style.fontSize=Math.max(20,Math.min(46,Math.round(step*0.74)))+'px'; $('lcBody').scrollTop=0; ls.style.lineHeight=step.toFixed(1)+'px';
   $('lcTitle').textContent=`${state.name} ${P.no}쪽 · ${k+1}행`;
   $('lcInfo').textContent=` 판독기 확신 ${Math.round((P.conf[k]||0)*100)}%`;

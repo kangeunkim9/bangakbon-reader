@@ -80,6 +80,27 @@ function findPeaks(x){ // scipy.signal.find_peaks (조건 없음)
   return pk;
 }
 
+// 위·아래 경계 다듬기: 괘선이 있으면 괘선 바로 안쪽, 없으면 먹이 끝나는 곳까지 (이미지 5%/95%에서 자르지 않음)
+function vbounds(b, bb, h3, W, Hh, t, bt){
+  const R=[]; 
+  for (let y=0;y<Hh;y++){
+    let sb=0, sh=0; for (let x=0;x<W;x++){ sb+=b[y*W+x]; sh+=h3[y*W+x]; }
+    if (sb/W>0.5 || sh>Math.floor(W/4)){ if (R.length && y===R[R.length-1][1]+1) R[R.length-1][1]=y; else R.push([y,y]); }
+  }
+  const RR=R.filter(r=>r[0]>Hh*0.01 && r[1]<Hh*0.99);
+  const top=RR.filter(r=>r[1]<Hh*0.35 && r[1]>t-120 && r[1]<t+120), bot=RR.filter(r=>r[0]>Hh*0.65 && r[0]>bt-120 && r[0]<bt+120);
+  if (top.length) t=top[top.length-1][1]+2;
+  if (bot.length) bt=bot[0][0]-2;
+  if (!top.length || !bot.length){
+    const rm=new Float64Array(Hh); for (let y=0;y<Hh;y++){ let s=0; for (let x=0;x<W;x++) s+=bb[y*W+x]; rm[y]=s/W; }
+    const sm=convSame(Array.from(rm),15); let mx=0; for (let y=t;y<bt;y++) mx=Math.max(mx,sm[y]);
+    const th=Math.max(0.01,mx*0.25);
+    if (!bot.length){ let y=bt-12; while (y+1<Math.min(Math.trunc(Hh*0.99),bt+80) && sm[y+1]>th) y++; bt=Math.max(bt,Math.min(Hh-1,y+12)); }
+    if (!top.length){ let y=t+12; while (y-1>Math.max(Math.trunc(Hh*0.01),t-80) && sm[y-1]>th) y--; t=Math.min(t,Math.max(0,y-12)); }
+  }
+  return [t, bt];
+}
+
 // segment(): 위·아래 경계와 행(세로줄) 목록. 오른쪽 행부터.
 KP.segment = function(im){
   const {w:W, h:Hh} = im; const b = binar(im);
@@ -125,6 +146,7 @@ KP.segment = function(im){
     let s=0; for (let x=a;x<c;x++) s+=colsum[x]; if (s>200) cols.push([a,c]);
   }
   if (frame){ t=T+4; bt=B-4; }
+  [t, bt] = vbounds(b, bb, h3, W, Hh, t, bt);
   return {t, bt, cols: cols.reverse(), pitch: pp};
 };
 

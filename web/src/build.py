@@ -3,12 +3,15 @@
 import json, os
 H = os.path.dirname(os.path.abspath(__file__))
 J = json.load(open(f'{H}/sample_out.json', encoding='utf-8'))
+# 학습 자료 받는 창구(Apps Script 웹 앱) 주소. inbox_url.txt에 한 줄로 둔다.
+INBOX = open(f'{H}/inbox_url.txt').read().strip() if os.path.exists(f'{H}/inbox_url.txt') else ''
 src = open(f'{H}/page.src.html', encoding='utf-8').read()
 eng = open(f'{H}/engine.js', encoding='utf-8').read()
 S = {'name':'금향졍긔 권하','title':'금향졍긔 권하 PDF 21쪽','no':21,'W':1500,'H':1910,
      't':J['t'],'bt':J['bt'],'cols':J['cols'],'lines':J['greedy']}
 gh = (src.replace('/*ENGINE*/', eng).replace('/*SAMPLE*/', json.dumps(S, ensure_ascii=False))
-         .replace("lm: 'lm7.gz.wasm',", "lm: null,").replace("approxMB: 47, github: false", "approxMB: 45, github: true"))
+         .replace("lm: 'lm7.gz.wasm',", "lm: null,").replace("approxMB: 47, github: false", "approxMB: 45, github: true")
+         .replace("inbox: ''", "inbox: " + json.dumps(INBOX)))
 assert "lm: null," in gh and "github: true" in gh
 SK = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
       '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'

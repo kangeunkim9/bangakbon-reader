@@ -1,0 +1,51 @@
+name: 학습 자료 보내기
+description: 판독기에서 검수한 면의 사진과 고친 판독문을 보냅니다.
+title: "[학습 자료] "
+labels: ["학습 자료"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        판독기의 **GitHub 이슈로 보내기** 버튼을 누르면 아래 칸이 채워지고 면 사진이 내려받아집니다.
+        내려받은 사진을 '면 사진' 칸에 끌어다 놓고 제출해 주세요.
+        원문 표기 그대로, 띄어쓰기 없이, 한 줄에 판본 한 행씩 적습니다. 읽을 수 없는 글자는 □로 적어 주세요.
+  - type: input
+    id: source
+    attributes:
+      label: 자료 이름
+      description: 작품명과 판본, 소장처 등
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: 쪽
+    validations:
+      required: true
+  - type: textarea
+    id: image
+    attributes:
+      label: 면 사진
+      description: 판독기가 내려받은 JPEG 파일을 여기에 끌어다 놓아 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: text
+    attributes:
+      label: 검수한 판독문
+      description: 오른쪽 행부터 한 줄에 한 행
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: meta
+    attributes:
+      label: 판독 정보
+      description: 자동으로 채워집니다
+  - type: checkboxes
+    id: agree
+    attributes:
+      label: 확인
+      options:
+        - label: 공개된 자료이거나 이용 허락을 받은 자료이며, 판독기 학습과 연구에 쓰는 데 동의합니다.
+          required: true

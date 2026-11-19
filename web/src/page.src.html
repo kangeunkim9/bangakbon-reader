@@ -109,6 +109,8 @@ button:disabled{opacity:.5;cursor:default}
 .trainbar p{margin:0;flex:1;min-width:14em;font-size:.84rem;color:var(--muted)}
 .trainbar b{color:var(--ink);font-weight:600}
 .trainbar .done{color:var(--ok);font-weight:600}
+.trainbar input{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);width:11em;max-width:100%}
+.trainbar .trainnote{flex-basis:100%;font-size:.78rem}
 .pages button .s{color:var(--ok)}
 .pages button[aria-current="true"] .s{color:inherit}
 textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--ink);padding:8px}
@@ -172,7 +174,10 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       </div>
       <div class="trainbar" id="trainbar" hidden>
         <p id="trainHint">모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.</p>
+        <input id="trainBy" class="ghonly-in" hidden placeholder="보내는 사람 (선택)" aria-label="보내는 사람 이름, 선택" maxlength="40">
         <button class="primary" id="sendTrain">검수 끝, 학습용으로 보내기</button>
+        <button id="sendIssue" hidden title="GitHub 계정이 있으면 이슈로도 보낼 수 있습니다">GitHub 이슈로 보내기</button>
+        <p class="trainnote" id="trainNote" hidden>보낸 면 사진과 판독문은 판독기 학습과 연구에 쓰입니다. 공개된 자료나 이용 허락을 받은 자료만 보내 주세요.</p>
       </div>
       <div class="oldk" id="oldk" hidden aria-label="옛한글 입력">
         <label class="imesw"><input type="checkbox" id="imeOn" checked> 옛한글 자판</label>
@@ -211,9 +216,9 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <h3>자료와 저장</h3>
       <p>올린 자료는 이 브라우저 안에서만 처리되고 어디에도 보내지 않습니다. 처음 판독할 때 엔진 파일(약 47MB)을 한 번 내려받습니다.</p>
       <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 창을 닫으면 사라지니 저장하거나 복사해 두세요.</p>
-      <p class="ghhide">검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
+      <p>검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
     </div>
-    <p class="ghonly" hidden>이 페이지는 GitHub에 올린 공개판입니다. 언어 모델 보정은 학습 자료(KOHICO) 이용 조건 때문에 빠져 있고, 학습용으로 보내기는 연구팀 판독기에서만 됩니다.</p>
+    <p class="ghonly" hidden>이 페이지는 GitHub에 올린 공개판입니다. 언어 모델 보정은 학습 자료(KOHICO) 이용 조건 때문에 빠져 있습니다. 검수한 면을 학습용으로 보내 주시면 다음 판 모델 학습에 씁니다. GitHub 계정이 있으면 이슈로도 보낼 수 있습니다.</p>
     <p class="credit">기획·제작 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> (성균관대학교 국어국문학과 BK 교육연구단 연구교수). 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 학습용 전사는 국립국어원이 제공하는 KOHICO(국어 역사 말뭉치)를 썼습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
   </section>
 </div>
@@ -226,7 +231,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 const CFG = {
   model: ['model_v5_0.wasm','model_v5_1.wasm','model_v5_2.wasm'], modelLabel: '5차 모델',
   lm: 'lm7.gz.wasm', charset: 'charset.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
-  approxMB: 47, github: false
+  approxMB: 47, github: false, inbox: '', issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
@@ -559,7 +564,9 @@ const pageKey=(P)=>'f'+state.fileKey+'-p'+P.no;
 const sentDoc=(P)=>(!P.sample && state.fileKey) ? SENT.get(pageKey(P)) : null;
 function renderTrain(){
   const P=state.pages[state.cur], bar=$('trainbar');
-  const ok = DB && ASSETS && P && !P.sample && P.status!=='empty' && P.lines.length && !state.running;
+  const can = (DB && ASSETS) || CFG.inbox;
+  const ok = can && P && !P.sample && P.status!=='empty' && P.lines.length && !state.running;
+  $('sendIssue').hidden = !(CFG.github && ok); $('trainBy').hidden = $('trainNote').hidden = !(CFG.github && ok);
   bar.hidden=!ok;
   if (ok){
     const d=sentDoc(P), n=P.lines.filter(l=>l.text!==l.orig).length;
@@ -567,9 +574,46 @@ function renderTrain(){
     $('trainHint').innerHTML = d ? `<span class="done">학습용으로 보냈습니다</span> (${new Date(d.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}, 고친 행 ${d.lines.filter(l=>l.text!==l.orig).length}개). 더 고쳤다면 다시 보내 주세요.`
       : `모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.${n?` 지금 고친 행 ${n}개.`:''}`;
   }
-  if (DB){ let pages=0, lines=0; for (const d of SENT.values()){ pages++; lines+=(d.lines||[]).length; } $('trainCount').textContent = pages ? `학습용으로 모은 면 ${pages}면, 행 ${lines}개` : ''; }
+  if (DB || CFG.inbox){ let pages=0, lines=0; for (const d of SENT.values()){ pages++; lines+=(d.lines||[]).length; } $('trainCount').textContent = pages ? `${DB?'학습용으로 모은 면':'이번에 보낸 면'} ${pages}면, 행 ${lines}개` : ''; }
 }
+function b64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
+function trainLines(P){ return P.lines.map(l=>({orig:l.orig,text:l.text})); }
+try { $('trainBy').value = localStorage.getItem('trainBy')||''; } catch(e){}
+$('trainBy').addEventListener('change',()=>{ try { localStorage.setItem('trainBy',$('trainBy').value.trim()); } catch(e){} });
+async function sendInbox(P){
+  const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
+  try {
+    const doc={src:state.name, page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
+      lines:trainLines(P), model:CFG.modelLabel, lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
+    const body=JSON.stringify(Object.assign({image: await b64(P.full)}, doc));
+    const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body});
+    const j=await r.json();
+    if (!j.ok) throw {code:j.error};
+    SENT.set(pageKey(P), doc); renderPages();
+    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개. 고맙습니다.`);
+  } catch(e){
+    const c=e&&e.code;
+    if (c==='daily_limit') setMsg('오늘 받을 수 있는 분량이 찼습니다. 내일 다시 보내 주세요.', true);
+    else if (c==='too_large') setMsg('면 사진이 너무 큽니다. GitHub 이슈로 보내 주세요.', true);
+    else setMsg('보내지 못했습니다. 잠시 뒤 다시 누르거나 GitHub 이슈로 보내 주세요. ('+(c||e)+')', true);
+  } finally { btn.disabled=false; renderTrain(); }
+}
+function saveBlob(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 60000); }
+async function sendIssue(){
+  const P=state.pages[state.cur]; if (!P || P.sample) return;
+  const img=`${state.name}_${P.no}쪽.jpg`;
+  saveBlob(P.full, img);
+  const text=P.lines.map(l=>l.text).join('\n'), n=P.lines.filter(l=>l.text!==l.orig).length;
+  const q={template:'training.yml', title:`[학습 자료] ${state.name} ${P.no}쪽`, source:state.name, page:String(P.no),
+    meta:`${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''} / 고친 행 ${n}개 / 판독기 ${location.host}`, text};
+  let url=CFG.issues+'?'+new URLSearchParams(q).toString(), copied=false;
+  if (url.length>7800){ delete q.text; url=CFG.issues+'?'+new URLSearchParams(q).toString(); try { await navigator.clipboard.writeText(text); copied=true; } catch(e){} }
+  window.open(url,'_blank','noopener');
+  setMsg(`GitHub 이슈 쓰기 창을 열었습니다. 방금 내려받은 ${img} 파일을 '면 사진' 칸에 끌어다 놓고 제출해 주세요.${copied?' 판독문이 길어서 클립보드에 복사해 두었으니 판독문 칸에 붙여 넣어 주세요.':''}`);
+}
+$('sendIssue').onclick=sendIssue;
 async function sendTrain(){
+  const P0=state.pages[state.cur]; if (P0 && !P0.sample && !(DB && ASSETS) && CFG.inbox) return sendInbox(P0);
   const P=state.pages[state.cur]; if (!P || !DB || !ASSETS || P.sample) return;
   const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
   try {

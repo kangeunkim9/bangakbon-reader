@@ -147,7 +147,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 <div class="wrap">
   <header class="head">
     <h1>방각본 판독기</h1>
-    <span class="tag" id="ver">시험판 · 판독 모델 5차 · 2026.11</span>
+    <span class="tag" id="ver">시험판 · 판독 모델 7차 · 2026.11</span>
     <p>방각본 한글 소설의 면 사진을 판본 행 그대로 텍스트로 옮깁니다.</p>
     <p class="by">만든 사람 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> · 성균관대학교 국어국문학과 BK 교육연구단</p>
   </header>
@@ -232,8 +232,8 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     </div>
     <div>
       <h3>정확도</h3>
-      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분에서 글자 오류율 <b class="num">7.8%</b><span class="lmonly">, 언어 모델 보정을 켜면 <b class="num">5.6%</b></span>입니다. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
-      <p>지금 판독 모델(5차)은 경판으로 학습했습니다. 완판과 다른 목판본 자료를 더한 모델을 준비하고 있어서, 그전까지 완판과 필사본은 오류가 많습니다. 판독문은 검토용 초벌로 쓰세요.</p>
+      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분에서 글자 오류율 <b class="num">5.9%</b>입니다<span class="lmonly">(언어 모델 보정을 켜면 조금 더 낮아집니다)</span>. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
+      <p>지금 판독 모델(7차)은 경판 17종에 AI허브 옛한글 목판본 자료를 더해 학습했습니다. 학습에 쓰지 않은 AI허브 소설(완판으로 보이는 것)에서는 오류율이 <b class="num">3.5%</b>입니다(5차는 10.4%). 필사본은 아직 오류가 많습니다. 판독문은 검토용 초벌로 쓰세요.</p>
     </div>
     <div>
       <h3>자료와 저장</h3>
@@ -526,8 +526,8 @@ window.KP = KP;
 </script>
 <script>
 const CFG = {
-  model: ['model_v5_0.wasm','model_v5_1.wasm','model_v5_2.wasm'], modelLabel: '5차 모델',
-  lm: null, charset: 'charset.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  model: ['model_v7_0.wasm','model_v7_1.wasm','model_v7_2.wasm','model_v7_3.wasm'], modelLabel: '7차 모델',
+  lm: null, charset: 'charset_v7.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
   approxMB: 45, github: true, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;

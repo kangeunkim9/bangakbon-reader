@@ -108,6 +108,12 @@ KP.segment = function(im){
   const bb = new Uint8Array(W*Hh); for (let i=0;i<bb.length;i++) bb[i] = b[i] & (1 - (vl[i]|hl[i]));
   const h3 = open1d(b, W, Hh, Math.floor(W/3), false);
   const rows=[]; for (let y=0;y<Hh;y++){ let s=0; for (let x=0;x<W;x++) s+=h3[y*W+x]; if (s > Math.floor(W/4)) rows.push(y); }
+  { // 사진 가장자리에 닿은 띠(종이 끝, 스캔 테두리)는 판 테두리로 보지 않는다
+    const keep=[]; let i=0;
+    while (i<rows.length){ let j=i; while (j+1<rows.length && rows[j+1]===rows[j]+1) j++;
+      if (rows[i]>Hh*0.01 && rows[j]<Hh*0.99) for (let k=i;k<=j;k++) keep.push(rows[k]);
+      i=j+1; }
+    rows.length=0; rows.push(...keep); }
   const frame = rows.length>=2 && rows[rows.length-1]-rows[0] > Hh*0.5;
   let T, B; if (frame){ T=rows[0]; B=rows[rows.length-1]; } else { T=Math.trunc(Hh*0.05); B=Math.trunc(Hh*0.95); }
   const rm = []; for (let y=T+5;y<B-5;y++){ let s=0; for (let x=0;x<W;x++) s+=bb[y*W+x]; rm.push(s/W); }
@@ -278,6 +284,19 @@ KP.beam = function(lp, T, C, chars, LM, alpha=0.3, beta=1.0, Bw=10){
 };
 KP.graphemes = function(s){
   try { return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(s)].length; } catch(e){ return s.length; }
+};
+// 두 면이 한 장에 나란히 찍힌 사진: 가운데 글자 없는 골을 찾아 오른쪽 면, 왼쪽 면으로 나눈다
+KP.splitSpread = function(g){
+  if (g.w < g.h*1.15) return [g];
+  const W=g.w, H=g.h, b=binar(g), vl=open1d(b, W, H, Math.floor(H/4), true);
+  const y0=Math.floor(H*0.1), y1=Math.floor(H*0.9), col=new Float64Array(W);
+  for (let y=y0;y<y1;y++) for (let x=0;x<W;x++){ const i=y*W+x; col[x]+=b[i]&(1-vl[i]); }
+  const k=Math.max(5, Math.round(W/60)|1), sm=convSame(Array.from(col), k);
+  let best=-1, bv=Infinity; for (let x=Math.floor(W*0.38); x<Math.ceil(W*0.62); x++) if (sm[x]<bv){ bv=sm[x]; best=x; }
+  const mid=Array.from(sm.slice(Math.floor(W*0.1), Math.ceil(W*0.9))).sort((u,v)=>u-v), med=mid[mid.length>>1];
+  if (!(best>0) || bv > med*0.25) return [g];   // 뚜렷한 골이 없으면 한 면으로 둔다
+  const crop=(x0,x1)=>{ const w=x1-x0, d=new Uint8Array(w*H); for (let y=0;y<H;y++) d.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d}; };
+  return [crop(best, W), crop(0, best)];
 };
 // 면 사진 너비를 학습 때(위키미디어 공용 스캔, 약 1500px)와 비슷하게 맞춘다
 KP.normWidth = function(im){

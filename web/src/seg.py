@@ -31,7 +31,7 @@ def vbounds(b, t, bt):
 def segment(im):
     b=binar(im); H_,W=b.shape
     lines=cv2.morphologyEx(b,cv2.MORPH_OPEN,np.ones((H_//4,1),np.uint8))|cv2.morphologyEx(b,cv2.MORPH_OPEN,np.ones((1,W//4),np.uint8))
-    hr=cv2.morphologyEx(b,cv2.MORPH_OPEN,np.ones((1,W//3),np.uint8)).sum(1); rows=np.where(hr>W//4)[0]
+    hr=cv2.morphologyEx(b,cv2.MORPH_OPEN,np.ones((1,W//3),np.uint8)).sum(1); rows=np.where(hr>W//4)[0]; rows=np.array([y for r in _runs(rows) if r[0]>H_*0.01 and r[1]<H_*0.99 for y in range(r[0],r[1]+1)],dtype=int)   # 사진 가장자리 띠 제외
     frame=len(rows)>=2 and rows.max()-rows.min()>H_*0.5
     T,B=(int(rows.min()),int(rows.max())) if frame else (int(H_*0.05),int(H_*0.95))
     bb=b&(1-lines)

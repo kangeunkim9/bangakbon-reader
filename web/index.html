@@ -401,6 +401,12 @@ KP.segment = function(im){
   const bb = new Uint8Array(W*Hh); for (let i=0;i<bb.length;i++) bb[i] = b[i] & (1 - (vl[i]|hl[i]));
   const h3 = open1d(b, W, Hh, Math.floor(W/3), false);
   const rows=[]; for (let y=0;y<Hh;y++){ let s=0; for (let x=0;x<W;x++) s+=h3[y*W+x]; if (s > Math.floor(W/4)) rows.push(y); }
+  { // 사진 가장자리에 닿은 띠(종이 끝, 스캔 테두리)는 판 테두리로 보지 않는다
+    const keep=[]; let i=0;
+    while (i<rows.length){ let j=i; while (j+1<rows.length && rows[j+1]===rows[j]+1) j++;
+      if (rows[i]>Hh*0.01 && rows[j]<Hh*0.99) for (let k=i;k<=j;k++) keep.push(rows[k]);
+      i=j+1; }
+    rows.length=0; rows.push(...keep); }
   const frame = rows.length>=2 && rows[rows.length-1]-rows[0] > Hh*0.5;
   let T, B; if (frame){ T=rows[0]; B=rows[rows.length-1]; } else { T=Math.trunc(Hh*0.05); B=Math.trunc(Hh*0.95); }
   const rm = []; for (let y=T+5;y<B-5;y++){ let s=0; for (let x=0;x<W;x++) s+=bb[y*W+x]; rm.push(s/W); }
@@ -572,6 +578,19 @@ KP.beam = function(lp, T, C, chars, LM, alpha=0.3, beta=1.0, Bw=10){
 KP.graphemes = function(s){
   try { return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(s)].length; } catch(e){ return s.length; }
 };
+// 두 면이 한 장에 나란히 찍힌 사진: 가운데 글자 없는 골을 찾아 오른쪽 면, 왼쪽 면으로 나눈다
+KP.splitSpread = function(g){
+  if (g.w < g.h*1.15) return [g];
+  const W=g.w, H=g.h, b=binar(g), vl=open1d(b, W, H, Math.floor(H/4), true);
+  const y0=Math.floor(H*0.1), y1=Math.floor(H*0.9), col=new Float64Array(W);
+  for (let y=y0;y<y1;y++) for (let x=0;x<W;x++){ const i=y*W+x; col[x]+=b[i]&(1-vl[i]); }
+  const k=Math.max(5, Math.round(W/60)|1), sm=convSame(Array.from(col), k);
+  let best=-1, bv=Infinity; for (let x=Math.floor(W*0.38); x<Math.ceil(W*0.62); x++) if (sm[x]<bv){ bv=sm[x]; best=x; }
+  const mid=Array.from(sm.slice(Math.floor(W*0.1), Math.ceil(W*0.9))).sort((u,v)=>u-v), med=mid[mid.length>>1];
+  if (!(best>0) || bv > med*0.25) return [g];   // 뚜렷한 골이 없으면 한 면으로 둔다
+  const crop=(x0,x1)=>{ const w=x1-x0, d=new Uint8Array(w*H); for (let y=0;y<H;y++) d.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d}; };
+  return [crop(best, W), crop(0, best)];
+};
 // 면 사진 너비를 학습 때(위키미디어 공용 스캔, 약 1500px)와 비슷하게 맞춘다
 KP.normWidth = function(im){
   if (im.w>1700 || im.w<1000){ const ow=1500, oh=Math.max(1,Math.round(im.h*ow/im.w)); return resizeBilinear(im, ow, oh); }
@@ -692,12 +711,12 @@ async function run(){
     const eng = await loadEngine(useLM);
     state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
     const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
-    for await (let [no,g] of pagesOf(state.file,a,b)){
-      g = KP.normWidth(g);
+    for await (let [no,g,side] of halves(pagesOf(state.file,a,b))){
+      g = KP.normWidth(g); const lab = no+'쪽'+(side?' '+side:'');
       if (state.stop) break;
-      setMsg(`${no}쪽 행 나누는 중…`); await idle();
+      setMsg(`${lab} 행 나누는 중…`); await idle();
       let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }
-      const P = {no: state.file.srcPage||no, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
+      const P = {no: state.file.srcPage||no, side, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
       state.pages.push(P); const idx=state.pages.length-1;
       if (seg.cols.length<6){ P.status='empty'; P.cols=[]; }
       else {
@@ -712,7 +731,7 @@ async function run(){
           P.lines.push({text:s, orig:s}); lineMs.push(performance.now()-tl);
           { let sm=0, nn=0; for (let t=0;t<T;t++){ let m=-Infinity, k=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; k=c; } if (k){ sm+=Math.exp(m); nn++; } } (P.conf=P.conf||[]).push(nn?sm/nn:0); }
           const per = median(lineMs)/1000, remainPages = Math.max(0,(state.total||1)-done-1);
-          setMsg(`${no}쪽 ${k+1}/${seg.cols.length}행 판독 중 · 남은 시간 약 ${fmtTime(per*((seg.cols.length-k-1)+remainPages*seg.cols.length))}`);
+          setMsg(`${lab} ${k+1}/${seg.cols.length}행 판독 중 · 남은 시간 약 ${fmtTime(per*((seg.cols.length-k-1)+remainPages*seg.cols.length))}`);
           setBar((done + (k+1)/seg.cols.length)/(state.total||1));
           if (state.cur===idx) renderCurrent(true);
           await idle();
@@ -734,6 +753,9 @@ async function run(){
   } finally { state.running=false; $('go').disabled=!state.file; $('stop').hidden=true; renderTrain(); }
 }
 const idle = ()=>new Promise(r=>setTimeout(r,0));
+// 두 면이 나란히 찍힌 사진은 오른쪽 면부터 따로 읽는다
+async function* halves(gen){ for await (const [no,g] of gen){ const parts=KP.splitSpread(g); if (parts.length<2) yield [no,g,'']; else { yield [no,parts[0],'오른쪽']; yield [no,parts[1],'왼쪽']; } } }
+function plab(P){ return P.no+'쪽'+(P.side?' '+P.side:''); }
 function fmtTime(s){ s=Math.max(1,Math.round(s)); return s<60 ? s+'초' : Math.floor(s/60)+'분 '+(s%60)+'초'; }
 function setMsg(t,err){ const m=$('msg'); m.textContent=t; m.classList.toggle('err',!!err); }
 function setBar(f){ $('barI').style.width=(Math.max(0,Math.min(1,f))*100).toFixed(1)+'%'; }
@@ -745,7 +767,7 @@ function renderPages(){
   if (state.pages.length<2){ nav.hidden=true; return; } nav.hidden=false;
   state.pages.forEach((p,i)=>{
     const b=document.createElement('button'); b.type='button';
-    b.innerHTML=`${p.no}쪽 <span class="n">${p.status==='ok'?p.lines.length+'행':'본문 없음'}</span>${sentDoc(p)?'<span class="s">보냄</span>':''}`;
+    b.innerHTML=`${plab(p)} <span class="n">${p.status==='ok'?p.lines.length+'행':'본문 없음'}</span>${sentDoc(p)?'<span class="s">보냄</span>':''}`;
     if (p.status!=='ok') b.classList.add('empty');
     b.setAttribute('aria-current', i===state.cur?'true':'false');
     b.onclick=()=>{ state.cur=i; renderPages(); renderCurrent(); };
@@ -757,20 +779,20 @@ function renderCurrent(partial){
   renderTrain();
   const P=state.pages[state.cur]; const facs=$('facs'), body=$('textBody');
   if (!P){ facs.innerHTML='<div class="none">아직 판독한 면이 없습니다.</div>'; body.innerHTML=''; return; }
-  const label = state.name ? `${state.name} · ${P.no}쪽` : `${P.no}쪽`;
-  $('facsTitle').textContent='판본 · '+P.no+'쪽'; $('textTitle').textContent='판독문 · '+P.no+'쪽';
+  const label = state.name ? `${state.name} · ${plab(P)}` : plab(P);
+  $('facsTitle').textContent='판본 · '+plab(P); $('textTitle').textContent='판독문 · '+plab(P);
   if (!facs.dataset.k || facs.dataset.k!==P.url+'|'+P.cols.length){
     facs.dataset.k=P.url+'|'+P.cols.length;
     const rects = P.cols.map(([a,c],k)=>`<rect class="c${k%2}" data-k="${k}" x="${a}" y="${P.t}" width="${c-a}" height="${P.bt-P.t}"/><text x="${(a+c)/2}" y="${Math.max(24,P.t-10)}">${k+1}</text>`).join('');
     facs.innerHTML=`<div class="stage"><img src="${P.url}" alt="${esc(label)} 사진" width="${P.W}" height="${P.H}"><svg viewBox="0 0 ${P.W} ${P.H}" preserveAspectRatio="none" role="img" aria-label="행 나눈 틀 ${P.cols.length}개">${rects}</svg></div>`;
     facs.querySelectorAll('rect').forEach(r=>r.addEventListener('click',()=>{ select(+r.dataset.k, true); }));
   }
-  if (partial && body.querySelector('ol') && body.dataset.no==String(P.no)){
+  if (partial && body.querySelector('ol') && body.dataset.no==plab(P)){
     const ol=body.querySelector('ol');
     for (let k=ol.children.length; k<P.lines.length; k++) ol.appendChild(lineItem(P,k));
     return;
   }
-  body.dataset.no=String(P.no);
+  body.dataset.no=plab(P);
   if (P.status==='empty'){ body.innerHTML='<div class="notice">본문 행을 찾지 못했습니다. 표지, 빈 면, 훼손된 면일 수 있습니다.</div>'; return; }
   body.innerHTML = (P.status==='nomatch' ? '<div class="notice">행이 너무 짧게 읽혔습니다. 본문이 아닌 면이거나 행 나누기가 어긋났을 수 있습니다.</div>' : '');
   const wrap=document.createElement('div'); if (state.vert) wrap.className='vert';
@@ -1005,7 +1027,7 @@ const esc = (s)=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':
 // ---------- 내보내기 ----------
 function lchg(l){ return !!l.removed || l.text!==l.orig; }
 function live(P){ return P.lines.filter(l=>!l.removed); }
-function pageText(P){ return `## ${P.no}쪽\n` + (P.status==='empty' ? '(본문 없음)\n' : P.status==='nomatch' ? '(본문을 찾지 못함: 표지·빈 면·훼손 면일 수 있음)\n' + live(P).map(l=>l.text).join('\n')+'\n' : live(P).map(l=>l.text).join('\n')+'\n'); }
+function pageText(P){ return `## ${plab(P)}\n` + (P.status==='empty' ? '(본문 없음)\n' : P.status==='nomatch' ? '(본문을 찾지 못함: 표지·빈 면·훼손 면일 수 있음)\n' + live(P).map(l=>l.text).join('\n')+'\n' : live(P).map(l=>l.text).join('\n')+'\n'); }
 function allText(){
   const d=new Date(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const n = state.pages.reduce((a,p)=>a+p.lines.filter(lchg).length,0);
@@ -1018,7 +1040,7 @@ async function copyText(t, okMsg){
 // ---------- 학습용으로 보내기 ----------
 let DB=null, ASSETS=null, UID=null, SENT=new Map();
 function fnv(str){ let h=0x811c9dc5; for (const ch of str){ h^=ch.codePointAt(0); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }
-const pageKey=(P)=>'f'+state.fileKey+'-p'+P.no;
+const pageKey=(P)=>'f'+state.fileKey+'-p'+P.no+(P.side||'');
 const sentDoc=(P)=>(!P.sample && state.fileKey) ? SENT.get(pageKey(P)) : null;
 function renderTrain(){
   const P=state.pages[state.cur], bar=$('trainbar');
@@ -1039,16 +1061,16 @@ function trainLines(P){ return P.lines.map(l=>l.added?{orig:'',text:l.text,added
 try { $('trainBy').value = localStorage.getItem('trainBy')||''; } catch(e){}
 $('trainBy').addEventListener('change',()=>{ try { localStorage.setItem('trainBy',$('trainBy').value.trim()); } catch(e){} });
 async function sendInbox(P){
-  const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
+  const btn=$('sendTrain'); btn.disabled=true; setMsg(`${plab(P)}을 학습용으로 보내는 중…`);
   try {
-    const doc={src:state.name, commons:state.commons||'', page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
+    const doc={src:state.name, commons:state.commons||'', page:P.no, side:P.side||'', W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
       lines:trainLines(P), note:(P.note||'').slice(0,2000), model:CFG.modelLabel, lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
     const body=JSON.stringify(Object.assign({image: await b64(P.full)}, doc));
     const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body});
     const j=await r.json();
     if (!j.ok) throw {code:j.error};
     SENT.set(pageKey(P), doc); renderPages(); loadCounts();
-    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
+    setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='daily_limit') setMsg('오늘 받을 수 있는 분량이 찼습니다. 내일 다시 보내 주세요.', true);
@@ -1070,17 +1092,17 @@ $('reportClose').onclick=()=>reportShow(false);
 async function sendTrain(){
   const P0=state.pages[state.cur]; if (P0 && !P0.sample && !(DB && ASSETS) && CFG.inbox) return sendInbox(P0);
   const P=state.pages[state.cur]; if (!P || !DB || !ASSETS || P.sample) return;
-  const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
+  const btn=$('sendTrain'); btn.disabled=true; setMsg(`${plab(P)}을 학습용으로 보내는 중…`);
   try {
     const key=pageKey(P), prev=SENT.get(key);
     let image = P.imageId || (prev && prev.image);
     if (!image){ const r=await ASSETS.upload(P.full,{type:'image/jpeg'}); image=r.id; }
     P.imageId=image;
-    const doc={src:state.name, page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
+    const doc={src:state.name, page:P.no, side:P.side||'', W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
       lines:trainLines(P), note:(P.note||'').slice(0,2000), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
     await DB.collection('training').doc(key).set(doc);
     SENT.set(key, doc); renderPages();
-    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개.`);
+    setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='quota_exceeded'||c==='quota_or_state') setMsg('학습 자료 저장 공간이 찼습니다. 고전소설 연구실에 알려 주세요.', true);
@@ -1099,7 +1121,7 @@ $('sendTrain').onclick=sendTrain;
   }
   renderTrain();
 })();
-$('copyPage').onclick=()=>{ const P=state.pages[state.cur]; if (P) copyText(live(P).map(l=>l.text).join('\n'), `${P.no}쪽 판독문을 복사했습니다.`); };
+$('copyPage').onclick=()=>{ const P=state.pages[state.cur]; if (P) copyText(live(P).map(l=>l.text).join('\n'), `${plab(P)} 판독문을 복사했습니다.`); };
 $('copyAll').onclick=()=>copyText(allText(), '전체 판독문을 복사했습니다.');
 let downloads=null;
 $('saveAll').onclick=async()=>{

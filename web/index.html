@@ -62,7 +62,7 @@ button:disabled{opacity:.5;cursor:default}
 .lchead{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;margin-bottom:8px}
 .lchead span{color:var(--muted);font-size:.82rem}
 .lchead .ghost{margin-left:auto}
-.lcbody{display:flex;gap:20px;align-items:flex-start;margin:4px 0 10px;overflow-x:auto}
+.lcbody{display:flex;gap:16px;align-items:flex-start;margin:4px 0 10px;max-height:72vh;overflow:auto;padding-right:6px}
 .lcimg{flex:none;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px}
 .lcimg canvas{display:block;width:auto}
 .lcv{flex:none}
@@ -195,7 +195,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     </div>
     <div class="linecard" id="linecard" hidden aria-live="polite">
       <div class="lchead"><b id="lcTitle">행을 가져오는 중…</b><span id="lcInfo"></span><button type="button" id="lcClose" class="ghost">그만하기</button></div>
-      <div class="lcbody">
+      <div class="lcbody" id="lcBody">
         <div class="lcimg"><canvas id="lcCanvas" aria-label="판본 행 사진"></canvas></div>
         <div class="lcv"><ol class="lines lc" id="lcList"></ol></div>
       </div>
@@ -1192,8 +1192,8 @@ function lineShow(){
   const cv=$('lcCanvas'), x=cv.getContext('2d'); cv.width=w; cv.height=h;
   x.drawImage(LM.img, Math.max(0,a-3), P.t, w, h, 0, 0, w, h);
   // 세로로 쓰면 옛한글 자모가 풀려 보여서, 글자를 한 줄에 하나씩 가로로 쓰고 세로로 쌓는다. 사진과 판독문 글자 간격을 맞춘다
-  const n=Math.max(6,KP.graphemes(P.lines[k].text).length), dispH=Math.round(Math.min(h*0.5, innerHeight*0.85)), step=dispH/n;
-  cv.style.height=dispH+'px'; const ls=$('lcList'); ls.style.fontSize=Math.max(14,Math.min(40,Math.round(step*0.78)))+'px'; ls.style.lineHeight=step.toFixed(1)+'px';
+  const n=Math.max(6,KP.graphemes(P.lines[k].text).length), dispH=Math.round(Math.max(n*40, Math.min(h*0.6, n*60))), step=dispH/n;
+  cv.style.height=dispH+'px'; const ls=$('lcList'); ls.style.fontSize=Math.max(20,Math.min(46,Math.round(step*0.74)))+'px'; $('lcBody').scrollTop=0; ls.style.lineHeight=step.toFixed(1)+'px';
   $('lcTitle').textContent=`${state.name} ${P.no}쪽 · ${k+1}행`;
   $('lcInfo').textContent=` 판독기 확신 ${Math.round((P.conf[k]||0)*100)}%`;
   const ol=$('lcList'); ol.innerHTML=''; const li=document.createElement('li'); li.dataset.k=k;

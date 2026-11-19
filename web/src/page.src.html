@@ -176,7 +176,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 <div class="wrap">
   <header class="head">
     <h1>방각본 판독기</h1>
-    <span class="tag" id="ver">시험판 · 판독 모델 7차 · 2026.11</span>
+    <span class="tag" id="ver">시험판 · 판독 모델 8차 · 2026.11</span>
     <button class="reportbtn" id="reportOpen" type="button" aria-expanded="false">문제 알리기</button>
     <p class="by">성균관대학교 국어국문학과 고전소설 연구실</p>
   </header>
@@ -281,7 +281,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <div>
       <h3>정확도</h3>
       <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분에서 글자 오류율 <b class="num">5.9%</b>입니다<span class="lmonly">(언어 모델 보정을 켜면 조금 더 낮아집니다)</span>. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
-      <p>지금 판독 모델(7차)은 경판 17종에 AI허브 옛한글 목판본 자료를 더해 학습했습니다. 학습에 쓰지 않은 AI허브 소설(완판으로 보이는 것)에서는 오류율이 <b class="num">3.5%</b>입니다(5차는 10.4%). 필사본은 아직 오류가 많습니다. 판독문은 검토용 초벌로 쓰세요.</p>
+      <p>지금 판독 모델(8차)은 경판 17종에 AI허브 옛한글 목판본 자료 약 14만 행을 더해 학습했습니다. 학습에 쓰지 않은 AI허브 완판 소설(춘향전·심청전)에서는 오류율이 <b class="num">2.8%</b>입니다(7차 3.6%, 5차 10.4%). 필사본은 아직 오류가 많습니다. 판독문은 검토용 초벌로 쓰세요.</p>
     </div>
     <div>
       <h3>자료와 저장</h3>
@@ -299,8 +299,8 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 </script>
 <script>
 const CFG = {
-  model: ['model_v7_0.wasm','model_v7_1.wasm','model_v7_2.wasm','model_v7_3.wasm'], modelLabel: '7차 모델',
-  lm: 'lm7.gz.wasm', charset: 'charset_v7.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  model: ['model_v8_0.wasm','model_v8_1.wasm','model_v8_2.wasm','model_v8_3.wasm'], modelLabel: '8차 모델',
+  lm: 'lm7.gz.wasm', charset: 'charset_v8.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
   approxMB: 47, github: false, minConf: 0.85, lineConf: 0.97, inbox: '', issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;

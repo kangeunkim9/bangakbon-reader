@@ -320,8 +320,7 @@ async function loadEngine(needLM){
     const buf = new Uint8Array(parts.reduce((a,b)=>a+b.length,0)); let o=0; for (const p of parts){ buf.set(p,o); o+=p.length; }
     const cs = (await (await fetch(CFG.charset)).json()).chars;
     setMsg('판독 엔진 준비 중…');
-    const sess = await ort.InferenceSession.create(buf, {executionProviders:['wasm']});
-    state.eng = {sess, cs};
+    state.eng = await makeRunners(buf, cs);
   }
   if (needLM && !state.eng.LM){
     setMsg('언어 모델 준비 중…');
@@ -330,6 +329,41 @@ async function loadEngine(needLM){
     state.eng.LM = KP.makeLM(JSON.parse(txt));
   }
   return state.eng;
+}
+
+// 판독기를 컴퓨터 코어 수만큼(최대 4개) 워커로 띄워 행을 나눠 읽는다. 워커를 못 쓰면 한 개로 읽는다
+const WORKER_SRC = `let sess;
+onmessage = async (e) => { const m = e.data;
+  try {
+    if (m.type==='init'){ importScripts(m.ortUrl); ort.env.wasm.wasmPaths=m.wasmPaths; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+      sess = await ort.InferenceSession.create(new Uint8Array(m.model), {executionProviders:['wasm']}); postMessage({type:'ready'}); }
+    else if (m.type==='run'){ const out = await sess.run({x:new ort.Tensor('float32', m.data, [1,1,64,m.w])});
+      const y = out.y.data.slice(); postMessage({type:'done', id:m.id, y, T:out.y.dims[1], C:out.y.dims[2]}, [y.buffer]); }
+  } catch(err){ postMessage({type:'error', id:m.id, msg:String((err&&err.message)||err)}); }
+};`;
+async function makeRunners(buf, cs){
+  const qn = +new URLSearchParams(location.search).get('workers');   // 시험용: ?workers=N
+  const n = qn>0 ? Math.min(8,qn) : Math.max(1, Math.min(4, (navigator.hardwareConcurrency||2) - 1));
+  if (n>=2 && typeof Worker!=='undefined'){
+    try {
+      const ortUrl = (document.querySelector('script[src*="ort.wasm"]')||{}).src;
+      const wasmPaths = new URL(ort.env.wasm.wasmPaths||'./', location.href).href;
+      const url = URL.createObjectURL(new Blob([WORKER_SRC], {type:'text/javascript'}));
+      const ws = await Promise.all(Array.from({length:n}, ()=>new Promise((res,rej)=>{
+        const w = new Worker(url); const to=setTimeout(()=>rej(new Error('워커 준비 시간 초과')), 60000);
+        w.onmessage = (e)=>{ if (e.data.type==='ready'){ clearTimeout(to); res(w); } else if (e.data.type==='error'){ clearTimeout(to); rej(new Error(e.data.msg)); } };
+        w.onerror = (e)=>{ clearTimeout(to); rej(new Error(e.message||'워커 오류')); };
+        w.postMessage({type:'init', ortUrl, wasmPaths, model: buf.slice().buffer});
+      })));
+      const wait = new Map(); let id=0; const busy = ws.map(()=>0);
+      ws.forEach((w,i)=>{ w.onmessage=(e)=>{ const m=e.data, cb=wait.get(m.id); if (!cb) return; wait.delete(m.id); busy[i]--; m.type==='done' ? cb.res({y:m.y, T:m.T, C:m.C}) : cb.rej(new Error(m.msg)); }; });
+      const run = (data, w)=>new Promise((res,rej)=>{ let i=0; for (let k=1;k<ws.length;k++) if (busy[k]<busy[i]) i=k; busy[i]++; const k=++id; wait.set(k,{res,rej}); const d=data.slice(); ws[i].postMessage({type:'run', id:k, data:d, w}, [d.buffer]); });
+      return {run, par:ws.length, cs};
+    } catch(e){ console.warn('워커를 쓰지 못해 한 개로 읽습니다:', e); }
+  }
+  const sess = await ort.InferenceSession.create(buf, {executionProviders:['wasm']});
+  const run = async (data, w)=>{ const out = await sess.run({x:new ort.Tensor('float32', data, [1,1,64,w])}); return {y:out.y.data, T:out.y.dims[1], C:out.y.dims[2]}; };
+  return {run, par:1, cs, sess};
 }
 
 // ---------- 입력 읽기 ----------
@@ -413,23 +447,26 @@ async function run(){
       if (seg.cols.length<6){ P.status='empty'; P.cols=[]; }
       else {
         if (idx===0 || state.cur===idx-1){ state.cur=idx; }
-        for (let k=0;k<seg.cols.length;k++){
-          if (state.stop) break;
-          const tl=performance.now(); const [x0,x1]=seg.cols[k];
-          const p=KP.prepLine(g,x0,x1,seg.t,seg.bt);
-          const out=await eng.sess.run({x:new ort.Tensor('float32',p.data,[1,1,64,p.w])});
-          const T=out.y.dims[1], C=out.y.dims[2]; const lp=KP.logSoftmax(out.y.data,T,C);
-          const s = useLM ? KP.beam(lp,T,C,eng.cs,eng.LM) : KP.greedy(lp,T,C,eng.cs);
-          P.lines.push({text:s, orig:s}); lineMs.push(performance.now()-tl);
-          { let sm=0, nn=0; for (let t=0;t<T;t++){ let m=-Infinity, k=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; k=c; } if (k){ sm+=Math.exp(m); nn++; } } (P.conf=P.conf||[]).push(nn?sm/nn:0); }
+        // 행 그림을 만들어 여러 판독기(워커)에 나눠 맡긴다. 처음 6행을 먼저 읽어 표지·빈 면이면 그만 읽는다
+        const n=seg.cols.length, res=new Array(n); let got=0;
+        const one=async(k)=>{
+          const [x0,x1]=seg.cols[k]; const p=KP.prepLine(g,x0,x1,seg.t,seg.bt);
+          const tl=performance.now(); const {y,T,C}=await eng.run(p.data,p.w); lineMs.push((performance.now()-tl)/eng.par);
+          const lp=KP.logSoftmax(y,T,C); const text = useLM ? KP.beam(lp,T,C,eng.cs,eng.LM) : KP.greedy(lp,T,C,eng.cs);
+          let sm=0, nn=0; for (let t=0;t<T;t++){ let m=-Infinity, kk=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; kk=c; } if (kk){ sm+=Math.exp(m); nn++; } }
+          res[k]={text, conf:nn?sm/nn:0}; got++;
           const per = median(lineMs)/1000, remainPages = Math.max(0,(state.total||1)-done-1);
-          setMsg(`${lab} ${k+1}/${seg.cols.length}행 판독 중 · 남은 시간 약 ${fmtTime(per*((seg.cols.length-k-1)+remainPages*seg.cols.length))}`);
-          setBar((done + (k+1)/seg.cols.length)/(state.total||1));
-          if (state.cur===idx) renderCurrent(true);
-          await idle();
-          // 처음 6행이 모두 거의 비면 표지·빈 면으로 보고 그 면은 그만 읽는다
-          if (k===5 && P.lines.every(l=>KP.graphemes(l.text)<3)) break;
-        }
+          setMsg(`${lab} ${got}/${n}행 판독 중 · 남은 시간 약 ${fmtTime(per*((n-got)+remainPages*n))}`);
+          setBar((done + got/n)/(state.total||1));
+          // 앞에서부터 이어진 행까지만 화면에 넣는다
+          let changed=false; while (P.lines.length<n && res[P.lines.length]){ const r=res[P.lines.length]; P.lines.push({text:r.text, orig:r.text}); (P.conf=P.conf||[]).push(r.conf); changed=true; }
+          if (changed && state.cur===idx) renderCurrent(true);
+        };
+        const runAll=async(ks)=>{ let q=0; await Promise.all(Array.from({length:Math.min(eng.par,ks.length)},async()=>{ while (q<ks.length && !state.stop){ await one(ks[q++]); } })); };
+        const head=[...Array(Math.min(6,n)).keys()];
+        await runAll(head);
+        const cover = P.lines.length>=head.length && P.lines.slice(0,head.length).every(l=>KP.graphemes(l.text)<3);
+        if (!cover && !state.stop) await runAll([...Array(n).keys()].slice(head.length));
         // 가장자리에 새로 붙인 행이 글자가 아니면(테두리·얼룩) 뺀다
         const junk=k=>P.lines[k] && ((P.conf[k]||0)<0.6 || KP.graphemes(P.lines[k].text)<3);
         if (seg.edge && seg.edge.last && P.lines.length===P.cols.length && junk(P.lines.length-1)){ P.lines.pop(); P.cols.pop(); P.conf.pop(); }

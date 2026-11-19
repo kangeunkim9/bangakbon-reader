@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><script src="ort.wasm.min.js"></script><script src="engine.js"></script>
+<script>
+window.run = async ()=>{
+  const R={}; const t0=performance.now();
+  const img=new Image(); img.src='sample.jpg'; await img.decode();
+  const g=KP.grayFromCanvasSource(img,img.naturalWidth,img.naturalHeight);
+  const seg=KP.segment(g); R.t=seg.t; R.bt=seg.bt; R.cols=seg.cols; R.tseg=performance.now()-t0;
+  ort.env.wasm.wasmPaths='./'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+  const parts=await Promise.all([0,1,2].map(i=>fetch('model_v5_'+i+'.wasm').then(r=>r.arrayBuffer()))); const buf=new Uint8Array(parts.reduce((a,b)=>a+b.byteLength,0)); let off=0; for(const p of parts){buf.set(new Uint8Array(p),off); off+=p.byteLength;} const s=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});
+  const cs=(await (await fetch('charset.json')).json()).chars;
+  const ds=new DecompressionStream('gzip'); const lmj=JSON.parse(await new Response((await fetch('lm7.gz.wasm')).body.pipeThrough(ds)).text());
+  const LM=KP.makeLM(lmj); R.tload=performance.now()-t0;
+  R.greedy=[]; R.beam=[]; let tinf=0, tbeam=0;
+  for (let k=0;k<seg.cols.length;k++){ const [a,c]=seg.cols[k];
+    const p=KP.prepLine(g,a,c,seg.t,seg.bt);
+    if(k==0){ let sm=0; for(const v of p.data) sm+=v; R.prep0=[p.w,sm,Array.from(p.data.slice(30*p.w,30*p.w+20))]; }
+    let t1=performance.now();
+    const out=await s.run({x:new ort.Tensor('float32',p.data,[1,1,64,p.w])}); tinf+=performance.now()-t1;
+    const y=out.y; const T=y.dims[1], C=y.dims[2]; const lp=KP.logSoftmax(y.data,T,C);
+    if(k==0) R.lp0=Array.from(lp.slice(0,10));
+    R.greedy.push(KP.greedy(lp,T,C,cs)); t1=performance.now(); R.beam.push(KP.beam(lp,T,C,cs,LM)); tbeam+=performance.now()-t1;
+  }
+  R.tinf=tinf; R.tbeam=tbeam; R.total=performance.now()-t0; return R;
+};
+</script>

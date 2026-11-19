@@ -1,0 +1,882 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>방각본 판독기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 판독 작업대: 왼쪽은 판본 사진(행 틀 표시), 오른쪽은 같은 순서의 판독문. 위에는 입력 띠. */
+:root{
+  --bg:#eef0ec; --surface:#fbfcfa; --sunk:#e3e6e1; --ink:#1b1f24; --muted:#5b636b; --line:#cfd4ce;
+  --accent:#264a7c; --accent-ink:#ffffff; --accent-soft:rgba(38,74,124,.12); --box:#264a7c; --box2:#2f7a6e;
+  --warn:#8a5a00; --warn-soft:#f6ecd6; --ok:#2f6b3f;
+  --f-display:"Gowun Batang","Noto Serif KR",serif;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-old:"함초롬바탕","HCR Batang","함초롬돋움","HCR Dotum","Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans CJK KR",sans-serif;
+  --r:6px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14171b; --surface:#1c2025; --sunk:#111418; --ink:#e4e7ea; --muted:#9aa3ab; --line:#30363d;
+  --accent:#8eb0e8; --accent-ink:#0f1620; --accent-soft:rgba(142,176,232,.16); --box:#8eb0e8; --box2:#79c7b8;
+  --warn:#e3b45c; --warn-soft:#2b2416; --ok:#86c79a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14171b; --surface:#1c2025; --sunk:#111418; --ink:#e4e7ea; --muted:#9aa3ab; --line:#30363d;
+  --accent:#8eb0e8; --accent-ink:#0f1620; --accent-soft:rgba(142,176,232,.16); --box:#8eb0e8; --box2:#79c7b8;
+  --warn:#e3b45c; --warn-soft:#2b2416; --ok:#86c79a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-ui);padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:18px}
+h1{font:700 1.9rem/1.2 var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font:600 1rem/1.3 var(--f-ui);margin:0}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+.head p{margin:0;color:var(--muted)}
+.head .by{flex-basis:100%;font-size:.86rem}
+.head .by a{color:var(--accent);font-weight:600;text-decoration:none;border-bottom:1px solid currentColor}
+.about .credit{grid-column:1/-1;border-top:1px solid var(--line);padding-top:12px;margin:4px 0 0;font-size:.84rem}
+.about .credit a{color:var(--accent)}
+.tag{font:500 .75rem/1 var(--f-mono);color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:5px 9px;white-space:nowrap}
+button,.btn{font:500 .9rem var(--f-ui);border-radius:var(--r);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;cursor:pointer;min-height:38px}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,.btn:focus-within,input:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+/* 입력 띠 */
+.intake{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;min-height:84px;background:var(--bg)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.drop .big{font-weight:600}
+.drop .sub{color:var(--muted);font-size:.85rem}
+.drop .file{font-family:var(--f-mono);font-size:.82rem;color:var(--accent);word-break:break-all}
+.opts{display:flex;flex-wrap:wrap;align-items:end;gap:12px}
+.field{display:grid;gap:4px;font-size:.8rem;color:var(--muted)}
+.field input[type=number]{width:84px;font:500 .95rem var(--f-mono);padding:7px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--ink)}
+.check{display:flex;align-items:center;gap:8px;font-size:.9rem;min-height:38px}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.status{grid-column:1/-1;display:grid;gap:6px}
+.status .msg{font-size:.88rem;color:var(--muted);min-height:1.4em}
+.status .msg.err{color:var(--warn)}
+.bar{height:6px;background:var(--sunk);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+/* 쪽 목록 */
+.pages{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.pages button{font:500 .8rem var(--f-mono);padding:6px 10px;min-height:32px;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.pages button[aria-current="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pages button .n{opacity:.7}
+.pages button.empty{color:var(--muted)}
+/* 작업대 */
+.bench{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;min-width:0}
+.panel>.ph{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.panel>.ph .sp{flex:1}
+.panel>.ph small{color:var(--muted);font-size:.8rem}
+.facs{position:relative;padding:10px}
+.facs .stage{position:relative;line-height:0}
+.facs img{width:100%;height:auto;display:block;border-radius:4px;filter:contrast(1.02)}
+.facs svg{position:absolute;inset:0;width:100%;height:100%}
+.facs svg rect{fill:transparent;stroke-width:2;vector-effect:non-scaling-stroke;cursor:pointer}
+.facs svg rect.c0{stroke:var(--box)} .facs svg rect.c1{stroke:var(--box2)}
+.facs svg rect.on{fill:var(--accent-soft);stroke-width:3}
+.facs svg text{font:600 26px var(--f-mono);fill:var(--box);paint-order:stroke;stroke:var(--surface);stroke-width:6px;text-anchor:middle;pointer-events:none}
+.facs .none{padding:40px 16px;text-align:center;color:var(--muted)}
+.lines{list-style:none;margin:0;padding:6px 0;counter-reset:ln}
+.lines li{display:grid;grid-template-columns:2.4em minmax(0,1fr);gap:6px;padding:5px 14px;border-left:3px solid transparent;align-items:baseline}
+.lines li.on{background:var(--accent-soft);border-left-color:var(--accent)}
+.lines li .no{font:500 .78rem var(--f-mono);color:var(--muted);text-align:right;cursor:pointer;user-select:none}
+.lines li .tx{font-family:var(--f-old);font-size:1.18rem;line-height:1.6;word-break:break-all;outline:none;border-radius:3px;padding:0 3px}
+.lines li.edited .no{color:var(--ok)}
+.lines li.edited .no::after{content:"·고침";font-size:.68rem;margin-left:1px}
+.vert .lines{writing-mode:vertical-rl;display:flex;flex-direction:column;flex-wrap:nowrap;height:min(78vh,820px);overflow-x:auto;padding:12px 8px}
+.vert .lines li{display:flex;flex-direction:column;gap:8px;padding:10px 4px;border-left:0;border-top:3px solid transparent;align-items:center}
+.vert .lines li.on{border-top-color:var(--accent)}
+.vert .lines li .no{writing-mode:horizontal-tb;text-align:center}
+.vert .lines li.edited .no::after{content:""}
+.vert .lines li .tx{font-size:1.25rem;line-height:1.5}
+.notice{margin:10px 14px;padding:10px 12px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn);font-size:.86rem}
+.foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.foot .sp{flex:1}
+.foot small{color:var(--muted)}
+.oldk{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.oldk .lab{font-size:.74rem;color:var(--muted);margin:0 2px 0 6px}
+.oldk .lab:first-child{margin-left:0}
+.oldk button{font-family:var(--f-old);font-size:1.15rem;min-height:34px;min-width:34px;padding:2px 6px;line-height:1}
+.oldk .help{flex-basis:100%;font-size:.8rem;color:var(--muted);margin-top:2px;font-family:var(--f-old)}
+.oldk .imesw{display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:600;margin-right:6px}
+.oldk .imesw input{width:18px;height:18px;accent-color:var(--accent)}
+.oldk .help kbd{font-family:var(--f-mono);border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--bg)}
+.trainbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--accent-soft)}
+.trainbar p{margin:0;flex:1;min-width:14em;font-size:.84rem;color:var(--muted)}
+.trainbar b{color:var(--ink);font-weight:600}
+.trainbar .done{color:var(--ok);font-weight:600}
+.pages button .s{color:var(--ok)}
+.pages button[aria-current="true"] .s{color:inherit}
+textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--ink);padding:8px}
+/* 안내 */
+.about{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px 28px;font-size:.88rem;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+.about h3{font:600 .8rem var(--f-ui);letter-spacing:.06em;color:var(--ink);margin:0 0 4px}
+.about p{margin:0 0 6px;max-width:62ch}
+.about b{color:var(--ink);font-weight:600}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+@media (max-width:820px){
+  .intake{grid-template-columns:1fr}
+  .bench{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <h1>방각본 판독기</h1>
+    <span class="tag" id="ver">판독 모델 5차 · 2026.11</span>
+    <p>방각본 한글 소설의 면 사진을 판본 행 그대로 텍스트로 옮깁니다.</p>
+    <p class="by">만든 사람 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> · 성균관대학교 국어국문학과 BK 교육연구단</p>
+  </header>
+
+  <section class="intake" aria-label="판독할 자료">
+    <label class="drop" id="drop" for="file">
+      <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="7" y="3" width="20" height="28" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 9v16M17 9v16M22 9v16" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 2.5"/></svg>
+      <span>
+        <span class="big">PDF나 면 사진을 여기에 놓거나 눌러서 고르세요</span><br>
+        <span class="sub">위키미디어 공용·국립중앙도서관 원문 PDF, JPG, PNG</span><br>
+        <span class="file" id="fname"></span>
+      </span>
+    </label>
+    <div class="opts">
+      <label class="field">시작 쪽<input type="number" id="p0" min="1" value="1"></label>
+      <label class="field">끝 쪽 (0 = 끝까지)<input type="number" id="p1" min="0" value="0"></label>
+      <label class="check lmonly"><input type="checkbox" id="lm" checked>언어 모델 보정</label>
+      <button class="primary" id="go" disabled>판독 시작</button>
+      <button id="stop" hidden>멈추기</button>
+      <button id="trySample" type="button">예시 면으로 해 보기</button>
+    </div>
+    <div class="status">
+      <div class="msg" id="msg" role="status">예시 면을 보여 드리고 있습니다. 자료를 고르면 판독을 시작할 수 있습니다.</div>
+      <div class="bar" aria-hidden="true"><i id="barI"></i></div>
+    </div>
+  </section>
+
+  <nav class="pages" id="pages" aria-label="쪽"></nav>
+
+  <section class="bench" id="bench">
+    <div class="panel">
+      <div class="ph"><h2 id="facsTitle">판본</h2><span class="sp"></span><small>틀을 누르면 그 행으로 갑니다</small></div>
+      <div class="facs" id="facs"></div>
+    </div>
+    <div class="panel" id="textPanel">
+      <div class="ph">
+        <h2 id="textTitle">판독문</h2><span class="sp"></span>
+        <button id="vert" aria-pressed="false">세로로 대조</button>
+        <button id="copyPage">이 면 복사</button>
+      </div>
+      <div class="trainbar" id="trainbar" hidden>
+        <p id="trainHint">모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.</p>
+        <button class="primary" id="sendTrain">검수 끝, 학습용으로 보내기</button>
+      </div>
+      <div class="oldk" id="oldk" hidden aria-label="옛한글 입력">
+        <label class="imesw"><input type="checkbox" id="imeOn" checked> 옛한글 자판</label>
+        <span class="lab">첫소리</span><span id="okL"></span>
+        <span class="lab">가운뎃소리</span><span id="okV"></span>
+        <span class="lab">끝소리</span><span id="okT"></span>
+        <p class="help" id="imeWarn" hidden><b>한/영 키를 눌러 영문 상태로 바꿔 주세요.</b> 옛한글 자판은 영문 상태에서 두벌식 자리로 입력합니다.</p>
+        <p class="help" id="imeHelp">두벌식 그대로 치면 됩니다(키보드는 <b>영문 상태</b>로). <b>ㅏ 두 번</b> → ᆞ, ᆞ 다음 ㅏ → ᆢ, ᆞ 다음 ㅣ → ᆡ / <b>Shift+ㅁ</b> ㅿ, <b>Shift+ㅇ</b> ㆁ, <b>Shift+ㅎ</b> ㆆ / 받침 없는 자음 이어 치기: ㅂ+ㅇ → ㅸ, ㅅ+ㄱ → ㅺ, ㅅ+ㄷ → ㅼ, ㅅ+ㅂ → ㅽ, ㅂ+ㅅ → ㅄ, ㅂ+ㄷ → ㅳ, ㅂ+ㅅ+ㄱ → ㅴ. 받침으로 ㆁ·ㅿ·ㆆ과 ㄹ+ㆆ도 됩니다. Backspace는 자모 하나씩 지웁니다.</p>
+        <p class="help">비슷한 현대 글자를 먼저 치고 단추를 누르면 바로 앞 글자가 바뀝니다. 예: 하 → <b>ᆞ</b> → ᄒᆞ, 사 → <b>ᄯ</b> → ᄯᅡ. 글자 뒤에서 <kbd>`</kbd>(숫자 1 왼쪽)를 누르면 모음이 ᆞ로, 한 번 더 누르면 ᆢ로 바뀝니다.</p>
+      </div>
+      <div id="textBody"></div>
+    </div>
+  </section>
+
+  <section class="foot">
+    <button class="primary" id="saveAll" hidden>텍스트 파일로 저장</button>
+    <button id="copyAll">전체 복사</button>
+    <small id="editInfo"></small>
+    <small id="trainCount"></small>
+    <span class="sp"></span>
+  </section>
+  <textarea class="copybox" id="copybox" hidden readonly aria-label="복사할 텍스트"></textarea>
+
+  <section class="about">
+    <div>
+      <h3>어떻게 읽나</h3>
+      <p>면에서 테두리선을 지우고 세로 행을 자동으로 나눈 뒤, 행마다 판독 모델이 글자를 읽습니다. 판독문은 <b>한 줄이 판본 한 행</b>이고 오른쪽 행부터 차례로 놓입니다.</p>
+      <p class="lmonly">언어 모델 보정은 KOHICO에 전사된 경판 45종으로 만든 자모 7-gram으로 애매한 글자를 고릅니다. 이 45종에 든 작품(금향정기 포함)은 실제보다 잘 읽힐 수 있습니다.</p>
+    </div>
+    <div>
+      <h3>정확도</h3>
+      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분에서 글자 오류율 <b class="num">7.8%</b><span class="lmonly">, 언어 모델 보정을 켜면 <b class="num">5.6%</b></span>입니다. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
+      <p>지금 판독 모델(5차)은 경판으로 학습했습니다. 완판과 다른 목판본 자료를 더한 모델을 준비하고 있어서, 그전까지 완판과 필사본은 오류가 많습니다. 판독문은 검토용 초벌로 쓰세요.</p>
+    </div>
+    <div>
+      <h3>자료와 저장</h3>
+      <p>올린 자료는 이 브라우저 안에서만 처리되고 어디에도 보내지 않습니다. 처음 판독할 때 엔진 파일(약 47MB)을 한 번 내려받습니다.</p>
+      <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 창을 닫으면 사라지니 저장하거나 복사해 두세요.</p>
+      <p class="ghhide">검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
+    </div>
+    <p class="ghonly" hidden>이 페이지는 GitHub에 올린 공개판입니다. 언어 모델 보정은 학습 자료(KOHICO) 이용 조건 때문에 빠져 있고, 학습용으로 보내기는 연구팀 판독기에서만 됩니다.</p>
+    <p class="credit">기획·제작 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> (성균관대학교 국어국문학과 BK 교육연구단 연구교수). 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 학습용 전사는 국립국어원이 제공하는 KOHICO(국어 역사 말뭉치)를 썼습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.wasm.min.js"></script>
+<script>
+// 경판 판독기 엔진: Colab 판독 노트북(②·③)의 행 자르기·전처리·디코딩을 그대로 옮긴 것
+(function(){
+const KP = {};
+const H = 64, MAXW = 1600;
+
+// ---------- 그림 ----------
+// gray = {w, h, d: Uint8Array}
+KP.grayFromImageData = function(id){
+  const n = id.width*id.height, s = id.data, d = new Uint8Array(n);
+  for (let i=0,j=0;i<n;i++,j+=4) d[i] = (s[j]*19595 + s[j+1]*38470 + s[j+2]*7471 + 0x8000) >> 16; // PIL convert('L')
+  return {w:id.width, h:id.height, d};
+};
+KP.grayFromCanvasSource = function(src, w, h){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(src,0,0,w,h);
+  return KP.grayFromImageData(g.getImageData(0,0,w,h));
+};
+
+// cv2.adaptiveThreshold(MEAN_C, BINARY_INV, 51, 12) → 먹=1
+function binar(im){
+  const {w,h,d} = im, r = 25, k = 51;
+  const hs = new Int32Array(w*h);
+  for (let y=0;y<h;y++){
+    const row = y*w; let s = 0;
+    for (let i=-r;i<=r;i++) s += d[row + Math.min(w-1, Math.max(0,i))];
+    for (let x=0;x<w;x++){
+      hs[row+x] = s;
+      s += d[row + Math.min(w-1, x+r+1)] - d[row + Math.max(0, x-r)];
+    }
+  }
+  const b = new Uint8Array(w*h), area = k*k;
+  for (let x=0;x<w;x++){
+    let s = 0;
+    for (let i=-r;i<=r;i++) s += hs[Math.min(h-1, Math.max(0,i))*w + x];
+    for (let y=0;y<h;y++){
+      const m = Math.round(s/area);
+      b[y*w+x] = (d[y*w+x] - m <= -12) ? 1 : 0;
+      s += hs[Math.min(h-1, y+r+1)*w + x] - hs[Math.max(0, y-r)*w + x];
+    }
+  }
+  return b;
+}
+// 선 모양 구조 요소로 열기(open). 침식은 바깥=1, 팽창은 바깥=0 (OpenCV 기본값)
+function open1d(src, w, h, k, vertical){
+  const a = Math.floor(k/2), out = new Uint8Array(w*h);
+  const n = vertical ? h : w, m = vertical ? w : h;
+  const ero = new Uint8Array(n), zp = new Int32Array(n+1);
+  for (let j=0;j<m;j++){
+    const at = vertical ? (i)=>i*w+j : (i)=>j*w+i;
+    zp[0]=0; for (let i=0;i<n;i++) zp[i+1] = zp[i] + (src[at(i)] ? 0 : 1);
+    for (let i=0;i<n;i++){
+      const lo = Math.max(0, i-a), hi = Math.min(n-1, i-a+k-1);
+      ero[i] = (zp[hi+1]-zp[lo]) === 0 ? 1 : 0;
+    }
+    // 팽창: 같은 창에서 하나라도 1
+    let op = new Int32Array(n+1);
+    for (let i=0;i<n;i++) op[i+1] = op[i] + ero[i];
+    for (let i=0;i<n;i++){
+      const lo = Math.max(0, i-a), hi = Math.min(n-1, i-a+k-1);
+      if (hi>=lo && op[hi+1]-op[lo] > 0) out[at(i)] = 1;
+    }
+  }
+  return out;
+}
+function convSame(x, k){ // np.convolve(x, ones(k)/k, 'same'), k 홀수
+  const n = x.length, r = (k-1)>>1, out = new Float64Array(n);
+  for (let i=0;i<n;i++){ let s=0; for (let j=i-r;j<=i+r;j++) if (j>=0 && j<n) s += x[j]; out[i] = s/k; }
+  return out;
+}
+function arange(start, stop, step){ const n = Math.max(0, Math.ceil((stop-start)/step)), a = new Array(n); for (let i=0;i<n;i++) a[i]=start+i*step; return a; }
+function findPeaks(x){ // scipy.signal.find_peaks (조건 없음)
+  const pk=[]; let i=1; const n=x.length;
+  while (i<n-1){
+    if (x[i-1] < x[i]){
+      let ia=i+1; while (ia<n-1 && x[ia]===x[i]) ia++;
+      if (x[ia] < x[i]){ pk.push((i + ia - 1) >> 1); i = ia; }
+    }
+    i++;
+  }
+  return pk;
+}
+
+// segment(): 위·아래 경계와 행(세로줄) 목록. 오른쪽 행부터.
+KP.segment = function(im){
+  const {w:W, h:Hh} = im; const b = binar(im);
+  const vl = open1d(b, W, Hh, Math.floor(Hh/4), true), hl = open1d(b, W, Hh, Math.floor(W/4), false);
+  const bb = new Uint8Array(W*Hh); for (let i=0;i<bb.length;i++) bb[i] = b[i] & (1 - (vl[i]|hl[i]));
+  const h3 = open1d(b, W, Hh, Math.floor(W/3), false);
+  const rows=[]; for (let y=0;y<Hh;y++){ let s=0; for (let x=0;x<W;x++) s+=h3[y*W+x]; if (s > Math.floor(W/4)) rows.push(y); }
+  const frame = rows.length>=2 && rows[rows.length-1]-rows[0] > Hh*0.5;
+  let T, B; if (frame){ T=rows[0]; B=rows[rows.length-1]; } else { T=Math.trunc(Hh*0.05); B=Math.trunc(Hh*0.95); }
+  const rm = []; for (let y=T+5;y<B-5;y++){ let s=0; for (let x=0;x<W;x++) s+=bb[y*W+x]; rm.push(s/W); }
+  const rp = convSame(rm, 15); let mx=-Infinity; for (const v of rp) mx=Math.max(mx,v);
+  const th = Math.max(0.01, mx*0.08); const on=[]; rp.forEach((v,i)=>{ if (v>th) on.push(i); });
+  let t = Math.max(T+2, T+5+(on.length?on[0]:0)-12), bt = Math.min(B-2, T+5+(on.length?on[on.length-1]:B-T-10)+12);
+  const colsum = new Float64Array(W);
+  for (let y=t;y<bt;y++) for (let x=0;x<W;x++) colsum[x]+=bb[y*W+x];
+  const prof = convSame(Array.from(colsum, v=>v/(bt-t)), 7);
+  const ink=[]; for (let x=0;x<W;x++) if (prof[x]>0.02) ink.push(x);
+  if (!ink.length) return {t, bt, cols:[]};
+  const x0=ink[0], x1=ink[ink.length-1];
+  let mean=0; for (let i=x0;i<x1;i++) mean+=prof[i]; mean/=(x1-x0);
+  const p=[]; for (let i=x0;i<x1;i++) p.push(prof[i]-mean);
+  const vals=[]; for (let lag=45; lag<150 && lag<p.length; lag++){ let s=0; for (let i=0;i+lag<p.length;i++) s+=p[i]*p[i+lag]; vals.push(s); }
+  if (!vals.length) return {t, bt, cols:[]};
+  let vmax=-Infinity, vam=0; vals.forEach((v,i)=>{ if (v>vmax){ vmax=v; vam=i; } });
+  let pk = findPeaks(vals).filter(k=>vals[k]>0.5*vmax); if (!pk.length) pk=[vam];
+  const p0 = 45+pk[0]; let best=null;
+  for (const pp of arange(p0*0.94, p0*1.06, 0.5)){
+    for (const o of arange(0, pp, 1.0)){
+      const xs = arange(x0-pp+o, x1+pp, pp).filter(x=>x>=0 && x<W).map(x=>Math.trunc(x));
+      let s=0; for (const x of xs) s+=prof[x]; s/=xs.length;
+      if (best===null || s<best[0]) best=[s,pp,o];
+    }
+  }
+  const pp=best[1], o=best[2], r=Math.trunc(pp*0.2);
+  const xs = arange(x0-pp+o, x1+pp, pp).filter(x=>x>=0 && x<W).map(x=>{
+    const lo=Math.max(0,Math.trunc(x)-r), hi=Math.min(W,Math.trunc(x)+r+1);
+    let am=lo; for (let i=lo;i<hi;i++) if (prof[i]<prof[am]) am=i;
+    return Math.trunc(Math.max(0,x-r)) + (am-lo);
+  });
+  const cols=[];
+  for (let i=0;i+1<xs.length;i++){
+    const a=xs[i], c=xs[i+1]; if (!(c-a > pp*0.5)) continue;
+    let s=0; for (let x=a;x<c;x++) s+=colsum[x]; if (s>200) cols.push([a,c]);
+  }
+  if (frame){ t=T+4; bt=B-4; }
+  return {t, bt, cols: cols.reverse(), pitch: pp};
+};
+
+// 한 행 잘라 90도 돌리고 autocontrast(1%) → 높이 64로 줄이기 (PIL 방식 그대로)
+function cropRot(im, x0, y0, x1, y1){ // PIL crop: 바깥은 0
+  const w0=x1-x0, h0=y1-y0, out=new Uint8Array(w0*h0); // 돌린 그림: 너비 h0, 높이 w0
+  for (let yp=0; yp<w0; yp++){
+    const xs = x0 + (w0-1-yp);
+    for (let xp=0; xp<h0; xp++){
+      const ys = y0 + xp;
+      out[yp*h0+xp] = (xs>=0 && xs<im.w && ys>=0 && ys<im.h) ? im.d[ys*im.w+xs] : 0;
+    }
+  }
+  return {w:h0, h:w0, d:out};
+}
+function autocontrast(im){
+  const h=new Array(256).fill(0); for (const v of im.d) h[v]++;
+  const n=im.d.length; let cut=Math.floor(n*1/100);
+  for (let lo=0;lo<256;lo++){ if (cut>h[lo]){ cut-=h[lo]; h[lo]=0; } else { h[lo]-=cut; cut=0; } if (cut<=0) break; }
+  cut=Math.floor(n*1/100);
+  for (let hi=255;hi>=0;hi--){ if (cut>h[hi]){ cut-=h[hi]; h[hi]=0; } else { h[hi]-=cut; cut=0; } if (cut<=0) break; }
+  let lo=0; for (;lo<256;lo++) if (h[lo]) break;
+  let hi=255; for (;hi>=0;hi--) if (h[hi]) break;
+  const lut=new Uint8Array(256);
+  if (hi<=lo) for (let i=0;i<256;i++) lut[i]=i;
+  else { const sc=255/(hi-lo), off=-lo*sc; for (let i=0;i<256;i++){ let v=Math.trunc(i*sc+off); lut[i]=v<0?0:v>255?255:v; } }
+  const d=new Uint8Array(n); for (let i=0;i<n;i++) d[i]=lut[im.d[i]];
+  return {w:im.w, h:im.h, d};
+}
+function coeffs(inSize, outSize){
+  const scale=inSize/outSize, fs=Math.max(scale,1), support=fs, ss=1/fs, list=[];
+  for (let xx=0;xx<outSize;xx++){
+    const center=(xx+0.5)*scale;
+    let xmin=Math.trunc(center-support+0.5); if (xmin<0) xmin=0;
+    let xmax=Math.trunc(center+support+0.5); if (xmax>inSize) xmax=inSize; xmax-=xmin;
+    const k=[]; let ww=0;
+    for (let x=0;x<xmax;x++){ let t=Math.abs((x+xmin-center+0.5)*ss); const v=t<1?1-t:0; k.push(v); ww+=v; }
+    const ki=k.map(v=>{ v = ww!==0 ? v/ww : v; const f=v*(1<<22); return f<0 ? Math.trunc(-0.5+f) : Math.trunc(0.5+f); });
+    list.push([xmin, ki]);
+  }
+  return list;
+}
+function resizeBilinear(im, ow, oh){ // Pillow ImagingResample, 8비트: 가로 → 세로
+  let cur=im;
+  if (ow!==im.w){
+    const cf=coeffs(im.w, ow), d=new Uint8Array(ow*im.h);
+    for (let y=0;y<im.h;y++) for (let x=0;x<ow;x++){
+      const [xm,k]=cf[x]; let s=1<<21; for (let i=0;i<k.length;i++) s+=im.d[y*im.w+xm+i]*k[i];
+      let v=Math.floor(s/4194304); d[y*ow+x]=v<0?0:v>255?255:v;
+    }
+    cur={w:ow,h:im.h,d};
+  }
+  if (oh!==cur.h){
+    const cf=coeffs(cur.h, oh), d=new Uint8Array(ow*oh);
+    for (let y=0;y<oh;y++){ const [ym,k]=cf[y];
+      for (let x=0;x<ow;x++){ let s=1<<21; for (let i=0;i<k.length;i++) s+=cur.d[(ym+i)*ow+x]*k[i];
+        let v=Math.floor(s/4194304); d[y*ow+x]=v<0?0:v>255?255:v; } }
+    cur={w:ow,h:oh,d};
+  }
+  return cur;
+}
+KP.prepLine = function(im, a, c, t, bt){
+  let r = cropRot(im, Math.max(0,a-3), t, c+3, bt);
+  r = autocontrast(r);
+  const nw = Math.min(MAXW, Math.max(32, Math.trunc(r.w*H/r.h)));
+  r = resizeBilinear(r, nw, H);
+  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-r.d[i]/255;
+  return {data:f, w:nw};
+};
+
+// ---------- 디코딩 ----------
+KP.logSoftmax = function(y, T, C){
+  const out = new Float32Array(T*C);
+  for (let t=0;t<T;t++){ let m=-Infinity; for (let c=0;c<C;c++) m=Math.max(m,y[t*C+c]);
+    let s=0; for (let c=0;c<C;c++) s+=Math.exp(y[t*C+c]-m); const l=m+Math.log(s);
+    for (let c=0;c<C;c++) out[t*C+c]=y[t*C+c]-l; }
+  return out;
+};
+KP.greedy = function(lp, T, C, chars){
+  let prev=0, o='';
+  for (let t=0;t<T;t++){ let k=0, m=-Infinity; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; k=c; }
+    if (k!==prev && k!==0) o+=chars[k-1]; prev=k; }
+  return o.normalize('NFC');
+};
+const NEG=-1e30;
+function lse(a,b){ if (a<-1e29) return b; if (b<-1e29) return a; const m=Math.max(a,b); return m+Math.log(Math.exp(a-m)+Math.exp(b-m)); }
+KP.makeLM = function(js){
+  const ctx=js.ctx, V=js.V, N=js.N, memo=new Map();
+  function lmp(h,c){
+    const key=h+'\u0001'+c; const hit=memo.get(key); if (hit!==undefined) return hit;
+    let v; const e=ctx[h];
+    if (h===''){ v=((e[2][c]||0)+e[1]/V)/(e[0]+e[1]); }
+    else { const lo=lmp(h.slice(1),c); v = (!e || e[0]===0) ? lo : ((e[2][c]||0)+e[1]*lo)/(e[0]+e[1]); }
+    if (memo.size>2000000) memo.clear(); memo.set(key,v); return v;
+  }
+  return {lmp, N};
+};
+KP.beam = function(lp, T, C, chars, LM, alpha=0.3, beta=1.0, Bw=10){
+  const thr=Math.log(1e-3), pad='^'.repeat(LM.N-1);
+  let beams=new Map([['',[0.0,NEG]]]);
+  for (let t=0;t<T;t++){
+    const o=t*C, cand=[]; for (let i=1;i<C;i++) if (lp[o+i]>thr) cand.push(i);
+    const nb=new Map(); const get=(k)=>{ let e=nb.get(k); if (!e){ e=[NEG,NEG]; nb.set(k,e); } return e; };
+    for (const [pre,[pb,pn]] of beams){
+      const tot=lse(pb,pn); let e=get(pre); e[0]=lse(e[0], tot+lp[o]); const last=pre.length?pre[pre.length-1]:null;
+      const ctx=(pad+pre).slice(-(LM.N-1));
+      for (const i of cand){
+        const ch=chars[i-1], lc=lp[o+i];
+        if (ch===last){
+          e=get(pre); e[1]=lse(e[1], pn+lc);
+          if (pb>NEG){ const f=get(pre+ch); f[1]=lse(f[1], pb+lc+alpha*Math.log(LM.lmp(ctx,ch))+beta); }
+        } else { const f=get(pre+ch); f[1]=lse(f[1], tot+lc+alpha*Math.log(LM.lmp(ctx,ch))+beta); }
+      }
+    }
+    beams=new Map([...nb.entries()].map(([k,v])=>[k,v,lse(v[0],v[1])]).sort((a,b)=>b[2]-a[2]).slice(0,Bw).map(([k,v])=>[k,v]));
+  }
+  let bk='', bs=-Infinity; for (const [k,v] of beams){ const s=lse(v[0],v[1]); if (s>bs){ bs=s; bk=k; } }
+  return bk.normalize('NFC');
+};
+KP.graphemes = function(s){
+  try { return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(s)].length; } catch(e){ return s.length; }
+};
+KP.H=H; KP.MAXW=MAXW;
+window.KP = KP;
+})();
+
+</script>
+<script>
+const CFG = {
+  model: ['model_v5_0.wasm','model_v5_1.wasm','model_v5_2.wasm'], modelLabel: '5차 모델',
+  lm: null, charset: 'charset.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  approxMB: 45, github: true
+};
+if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
+if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
+const SAMPLE = {"name": "금향졍긔 권하", "title": "금향졍긔 권하 PDF 21쪽", "no": 21, "W": 1500, "H": 1910, "t": 97, "bt": 1812, "cols": [[1401, 1498], [1304, 1401], [1204, 1304], [1108, 1204], [1019, 1108], [916, 1019], [820, 916], [724, 820], [626, 724], [532, 626], [436, 532], [337, 436], [239, 337], [124, 239], [51, 124]], "lines": ["ᄒᆞ믈듯고삼인이바야흐로길를올나낙양의이르러는슌쇼구", "을맛나진즁의이르러공문ᄉᆞ연을젼ᄒᆞᆫᄃᆡ복고회은이드러가곽", "고긔품ᄒᆞ되밧긔피란ᄒᆞ는녀ᄌᆞ삼인이슈양셩부장뇌만츌의고", "문을가지고지ᄂᆞ가기로쇼장이쳔단치못ᄒᆞ여알외ᄂᆞ이다ᄒᆞ거ᄂᆞᆯ고", "이공문을드리라ᄒᆞ여보고왈원ᄂᆡ갈ᄐᆡ고의녀ᄋᆡ여니와거년츙", "구월익셩졉ᄒᆞᆫ거시여ᄂᆞᆯ엇지이럿틋지완히왓ᄂᆞ뇨회온왈ᄉᆞ", "장이ᄌᆞ셔히무른즉일노의도젹을두려길를ᄒᆡᆼ치못ᄒᆞ고무ᄐᆡ", "관밧긔셔ᄉᆞ오삭을두류ᄒᆞ다가동경회복ᄒᆫ믈듯고이졔야이곡ᆼ", "의이르럿노라존더이다곽공왈이믜뭇기를명ᄇᆡᆨ히ᄒᆞ여실진디", "이는츙신의ᄯᆞᆯ이니뇌장군의공문이업셔도일졍그르지아니리러ᅡᆯ", "기ᄀᆯ를가르쳐장안으로보ᄂᆡ미조흐되다만젹병이셔경의웅거ᄒᆞ시ᅩ", "스니무ᄉᆞ히득달치못헐거시ᄆᆡ아직이근쳐의잇다가시셰를보아ᄂᆞ", "라가라일으라ᄒᆞ거ᄂᆞᆯ회은이녕을듯고나와위구를불너곽공의시", "르던말를이른후공문을도로쥬거ᄂᆞᆯ삼인이ᄉᆞ례ᄒᆞ고진밧긔ᄉ니", "와두루ᄉᆞᆲ펴인가를찻고져ᄒᆞ여방황ᄒᆞ더니ᄒᆞᆫ곳의연긔나믈"]};
+const $ = (id)=>document.getElementById(id);
+const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, lmReady:null };
+
+// ---------- 엔진 내려받기 ----------
+async function fetchBytes(url, onBytes){
+  const r = await fetch(url); if (!r.ok) throw new Error(url+' 응답 '+r.status);
+  const rd = r.body.getReader(); const chunks=[]; let n=0;
+  for(;;){ const {done,value} = await rd.read(); if (done) break; chunks.push(value); n+=value.length; onBytes(value.length); }
+  const out = new Uint8Array(n); let o=0; for (const c of chunks){ out.set(c,o); o+=c.length; } return out;
+}
+async function loadEngine(needLM){
+  if (!state.eng){
+    let got=0; const tick=(n)=>{ got+=n; setMsg(`판독 엔진 내려받는 중 ${(got/1e6).toFixed(0)} / 약 ${CFG.approxMB}MB (처음 한 번만)`); setBar(got/(CFG.approxMB*1e6)); };
+    ort.env.wasm.wasmPaths='./'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+    const parts = await Promise.all(CFG.model.map(u=>fetchBytes(u,tick)));
+    const buf = new Uint8Array(parts.reduce((a,b)=>a+b.length,0)); let o=0; for (const p of parts){ buf.set(p,o); o+=p.length; }
+    const cs = (await (await fetch(CFG.charset)).json()).chars;
+    setMsg('판독 엔진 준비 중…');
+    const sess = await ort.InferenceSession.create(buf, {executionProviders:['wasm']});
+    state.eng = {sess, cs};
+  }
+  if (needLM && !state.eng.LM){
+    setMsg('언어 모델 준비 중…');
+    const r = await fetch(CFG.lm);
+    const txt = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
+    state.eng.LM = KP.makeLM(JSON.parse(txt));
+  }
+  return state.eng;
+}
+
+// ---------- 입력 읽기 ----------
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('PDF 모듈을 불러오지 못했습니다')); document.head.appendChild(s); }); }
+async function pdfjs(){
+  if (!window.pdfjsLib){ await loadScript(CFG.pdfjs+'pdf.min.js'); await loadScript(CFG.pdfjs+'pdf.worker.min.js'); }
+  return window.pdfjsLib;
+}
+function grayFromPdfImage(obj){
+  const w=obj.width, h=obj.height;
+  if (obj.bitmap) return KP.grayFromCanvasSource(obj.bitmap, w, h);
+  const s=obj.data, n=w*h, d=new Uint8Array(n);
+  if (s.length===n*4) for (let i=0,j=0;i<n;i++,j+=4) d[i]=(s[j]*19595+s[j+1]*38470+s[j+2]*7471+0x8000)>>16;
+  else if (s.length===n*3) for (let i=0,j=0;i<n;i++,j+=3) d[i]=(s[j]*19595+s[j+1]*38470+s[j+2]*7471+0x8000)>>16;
+  else if (s.length===n) d.set(s);
+  else { const rb=Math.ceil(w/8); for (let y=0;y<h;y++) for (let x=0;x<w;x++) d[y*w+x]=(s[y*rb+(x>>3)]&(128>>(x&7)))?255:0; }
+  return {w,h,d};
+}
+async function* pagesOf(file, a, b){
+  if (/\.pdf$/i.test(file.name) || file.type==='application/pdf'){
+    const lib = await pdfjs();
+    const doc = await lib.getDocument({data: new Uint8Array(await file.arrayBuffer()), isOffscreenCanvasSupported:false}).promise;
+    const last = b<=0 ? doc.numPages : Math.min(b, doc.numPages);
+    state.total = last-Math.max(1,a)+1;
+    for (let i=Math.max(1,a); i<=last; i++){
+      const pg = await doc.getPage(i); let g=null;
+      try {
+        const ops = await pg.getOperatorList(); const names=[];
+        ops.fnArray.forEach((f,k)=>{ if (f===lib.OPS.paintImageXObject) names.push(ops.argsArray[k][0]); });
+        if (names.length===1){
+          const nm=names[0]; const store = nm.startsWith('g_') ? pg.commonObjs : pg.objs;
+          const obj = await new Promise(res=>store.get(nm,res));
+          if (obj && obj.width>300) g = grayFromPdfImage(obj);
+        }
+      } catch(e){ g=null; }
+      if (!g){ // 그림이 하나가 아니면 200dpi로 그려서 읽기
+        const vp = pg.getViewport({scale:200/72}); const c=document.createElement('canvas'); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+        await pg.render({canvasContext:c.getContext('2d'), viewport:vp}).promise;
+        g = KP.grayFromImageData(c.getContext('2d').getImageData(0,0,c.width,c.height));
+      }
+      pg.cleanup(); yield [i, g];
+    }
+  } else {
+    state.total = 1;
+    const bmp = await createImageBitmap(file);
+    yield [1, KP.grayFromCanvasSource(bmp, bmp.width, bmp.height)];
+  }
+}
+function fullJPEG(g){ // 학습용 원본 크기 사진
+  const c=document.createElement('canvas'); c.width=g.w; c.height=g.h; const x=c.getContext('2d');
+  const id=x.createImageData(g.w,g.h); for (let i=0,j=0;i<g.d.length;i++,j+=4){ id.data[j]=id.data[j+1]=id.data[j+2]=g.d[i]; id.data[j+3]=255; }
+  x.putImageData(id,0,0); return new Promise(res=>c.toBlob(res,'image/jpeg',0.95));
+}
+function previewURL(g){ // 화면용 축소 사진
+  const sc = Math.min(1, 1100/g.w), w=Math.round(g.w*sc), h=Math.round(g.h*sc);
+  const c=document.createElement('canvas'); c.width=g.w; c.height=g.h; const x=c.getContext('2d');
+  const id=x.createImageData(g.w,g.h); for (let i=0,j=0;i<g.d.length;i++,j+=4){ id.data[j]=id.data[j+1]=id.data[j+2]=g.d[i]; id.data[j+3]=255; }
+  x.putImageData(id,0,0);
+  const c2=document.createElement('canvas'); c2.width=w; c2.height=h; c2.getContext('2d').drawImage(c,0,0,w,h);
+  return new Promise(res=>c2.toBlob(b=>res(URL.createObjectURL(b)),'image/jpeg',0.86));
+}
+
+// ---------- 판독 ----------
+const median = (a)=>{ const s=[...a].sort((x,y)=>x-y); return s.length? s[s.length>>1] : 0; };
+async function run(){
+  if (!state.file || state.running) return;
+  const useLM = $('lm').checked;
+  state.running=true; state.stop=false; $('go').disabled=true; $('stop').hidden=false;
+  const prevPages = state.pages, prevName = state.name;
+  try {
+    const eng = await loadEngine(useLM);
+    state.pages=[]; state.name=state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
+    const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
+    for await (const [no,g] of pagesOf(state.file,a,b)){
+      if (state.stop) break;
+      setMsg(`${no}쪽 행 나누는 중…`); await idle();
+      let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }
+      const P = {no, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
+      state.pages.push(P); const idx=state.pages.length-1;
+      if (seg.cols.length<6){ P.status='empty'; P.cols=[]; }
+      else {
+        if (idx===0 || state.cur===idx-1){ state.cur=idx; }
+        for (let k=0;k<seg.cols.length;k++){
+          if (state.stop) break;
+          const tl=performance.now(); const [x0,x1]=seg.cols[k];
+          const p=KP.prepLine(g,x0,x1,seg.t,seg.bt);
+          const out=await eng.sess.run({x:new ort.Tensor('float32',p.data,[1,1,64,p.w])});
+          const T=out.y.dims[1], C=out.y.dims[2]; const lp=KP.logSoftmax(out.y.data,T,C);
+          const s = useLM ? KP.beam(lp,T,C,eng.cs,eng.LM) : KP.greedy(lp,T,C,eng.cs);
+          P.lines.push({text:s, orig:s}); lineMs.push(performance.now()-tl);
+          const per = median(lineMs)/1000, remainPages = Math.max(0,(state.total||1)-done-1);
+          setMsg(`${no}쪽 ${k+1}/${seg.cols.length}행 판독 중 · 남은 시간 약 ${fmtTime(per*((seg.cols.length-k-1)+remainPages*seg.cols.length))}`);
+          setBar((done + (k+1)/seg.cols.length)/(state.total||1));
+          if (state.cur===idx) renderCurrent(true);
+          await idle();
+        }
+        if (P.lines.length && median(P.lines.map(l=>KP.graphemes(l.text)))<8) P.status='nomatch';
+      }
+      done++; renderPages(); if (state.cur===idx) renderCurrent();
+    }
+    const nOK = state.pages.filter(p=>p.status==='ok').length;
+    setMsg(`${state.stop?'멈춤. ':''}${state.pages.length}쪽 가운데 본문 ${nOK}면 판독 완료 (${fmtTime((performance.now()-t0)/1000)}). 판독문을 고친 뒤 저장하세요.`);
+    setBar(1); renderAll();
+  } catch(e){
+    console.error(e); setMsg('판독하지 못했습니다: '+(e.message||e)+' 파일이 PDF·JPG·PNG인지 확인하고 다시 시도하세요.', true);
+    if (!state.pages.length){ state.pages=prevPages; state.name=prevName; renderAll(); }
+  } finally { state.running=false; $('go').disabled=!state.file; $('stop').hidden=true; renderTrain(); }
+}
+const idle = ()=>new Promise(r=>setTimeout(r,0));
+function fmtTime(s){ s=Math.max(1,Math.round(s)); return s<60 ? s+'초' : Math.floor(s/60)+'분 '+(s%60)+'초'; }
+function setMsg(t,err){ const m=$('msg'); m.textContent=t; m.classList.toggle('err',!!err); }
+function setBar(f){ $('barI').style.width=(Math.max(0,Math.min(1,f))*100).toFixed(1)+'%'; }
+
+// ---------- 화면 ----------
+function renderAll(){ renderPages(); renderCurrent(); renderEditInfo(); renderTrain(); }
+function renderPages(){
+  const nav=$('pages'); nav.innerHTML='';
+  if (state.pages.length<2){ nav.hidden=true; return; } nav.hidden=false;
+  state.pages.forEach((p,i)=>{
+    const b=document.createElement('button'); b.type='button';
+    b.innerHTML=`${p.no}쪽 <span class="n">${p.status==='ok'?p.lines.length+'행':'본문 없음'}</span>${sentDoc(p)?'<span class="s">보냄</span>':''}`;
+    if (p.status!=='ok') b.classList.add('empty');
+    b.setAttribute('aria-current', i===state.cur?'true':'false');
+    b.onclick=()=>{ state.cur=i; renderPages(); renderCurrent(); };
+    nav.appendChild(b);
+  });
+}
+let active=-1;
+function renderCurrent(partial){
+  renderTrain();
+  const P=state.pages[state.cur]; const facs=$('facs'), body=$('textBody');
+  if (!P){ facs.innerHTML='<div class="none">아직 판독한 면이 없습니다.</div>'; body.innerHTML=''; return; }
+  const label = state.name ? `${state.name} · ${P.no}쪽` : `${P.no}쪽`;
+  $('facsTitle').textContent='판본 · '+P.no+'쪽'; $('textTitle').textContent='판독문 · '+P.no+'쪽';
+  if (!facs.dataset.k || facs.dataset.k!==P.url+'|'+P.cols.length){
+    facs.dataset.k=P.url+'|'+P.cols.length;
+    const rects = P.cols.map(([a,c],k)=>`<rect class="c${k%2}" data-k="${k}" x="${a}" y="${P.t}" width="${c-a}" height="${P.bt-P.t}"/><text x="${(a+c)/2}" y="${Math.max(24,P.t-10)}">${k+1}</text>`).join('');
+    facs.innerHTML=`<div class="stage"><img src="${P.url}" alt="${esc(label)} 사진" width="${P.W}" height="${P.H}"><svg viewBox="0 0 ${P.W} ${P.H}" preserveAspectRatio="none" role="img" aria-label="행 나눈 틀 ${P.cols.length}개">${rects}</svg></div>`;
+    facs.querySelectorAll('rect').forEach(r=>r.addEventListener('click',()=>{ select(+r.dataset.k, true); }));
+  }
+  if (partial && body.querySelector('ol') && body.dataset.no==String(P.no)){
+    const ol=body.querySelector('ol');
+    for (let k=ol.children.length; k<P.lines.length; k++) ol.appendChild(lineItem(P,k));
+    return;
+  }
+  body.dataset.no=String(P.no);
+  if (P.status==='empty'){ body.innerHTML='<div class="notice">본문 행을 찾지 못했습니다. 표지, 빈 면, 훼손된 면일 수 있습니다.</div>'; return; }
+  body.innerHTML = (P.status==='nomatch' ? '<div class="notice">행이 너무 짧게 읽혔습니다. 본문이 아닌 면이거나 행 나누기가 어긋났을 수 있습니다.</div>' : '');
+  const wrap=document.createElement('div'); if (state.vert) wrap.className='vert';
+  const ol=document.createElement('ol'); ol.className='lines'; ol.setAttribute('aria-label','판독문, 오른쪽 행부터');
+  P.lines.forEach((_,k)=>ol.appendChild(lineItem(P,k)));
+  wrap.appendChild(ol); body.appendChild(wrap);
+  if (active>=0) select(active,false);
+}
+function lineItem(P,k){
+  const L=P.lines[k]; const li=document.createElement('li'); li.dataset.k=k; if (L.text!==L.orig) li.classList.add('edited');
+  const no=document.createElement('span'); no.className='no'; no.textContent=k+1; no.title=(k+1)+'행 틀 보기';
+  const tx=document.createElement('span'); tx.className='tx'; tx.contentEditable='true'; tx.spellcheck=false; tx.textContent=L.text;
+  tx.setAttribute('aria-label',(k+1)+'행');
+  tx.addEventListener('focus',()=>select(k,false));
+  tx.addEventListener('input',()=>{ L.text=tx.textContent.replace(/\n/g,'').replace(/\u00a0/g,' '); li.classList.toggle('edited', L.text!==L.orig); renderEditInfo(); });
+  tx.addEventListener('beforeinput',e=>{ if (e.inputType==='insertText' && e.data==='`'){ e.preventDefault(); oldVowel(tx); } });
+  tx.addEventListener('focus',()=>{ curTx=tx; $('oldk').hidden=false; });
+  tx.addEventListener('keydown',e=>imeKeydown(e,tx));
+  tx.addEventListener('mousedown',()=>imeCommit()); tx.addEventListener('blur',()=>imeCommit());
+  tx.addEventListener('keydown',e=>{ if (e.key==='Enter'){ e.preventDefault(); const nx=li.nextElementSibling; if (nx) nx.querySelector('.tx').focus(); } });
+  no.addEventListener('click',()=>select(k,true));
+  li.append(no,tx); return li;
+}
+// ---------- 옛한글 입력 ----------
+let curTx=null;
+const OK={L:['ᄭ','ᄯ','ᄲ','ᄶ','ᄡ','ᄧ','ᄩ','ᄠ','ᄢ','ᅀ','ᅌ','ᅙ','ᄫ'],V:['ᆞ','ᆢ'],T:['ᇰ','ᇫ','ᇹ','ᆪ','ᆰ','ᆱ','ᆲ','ᇝ','ᇙ','ᇧ']};
+const isL=c=>(c>='\u1100'&&c<='\u115F')||(c>='\uA960'&&c<='\uA97F'), isV=c=>(c>='\u1160'&&c<='\u11A7')||(c>='\uD7B0'&&c<='\uD7C6'), isT=c=>(c>='\u11A8'&&c<='\u11FF')||(c>='\uD7CB'&&c<='\uD7FB');
+function caretIn(tx){
+  const sel=getSelection(); if (!sel.rangeCount) return null; const r=sel.getRangeAt(0);
+  if (!tx.contains(r.startContainer)) return null;
+  const pre=document.createRange(); pre.selectNodeContents(tx); pre.setEnd(r.startContainer,r.startOffset);
+  return pre.toString().length;
+}
+function setCaret(tx,pos){
+  tx.normalize(); let node=tx.firstChild; if (!node){ node=document.createTextNode(''); tx.appendChild(node); }
+  const r=document.createRange(); r.setStart(node,Math.min(pos,node.length)); r.collapse(true); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+function lastGrapheme(str){ try { const g=[...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(str)]; return g.length?g[g.length-1].segment:''; } catch(e){ return str.slice(-1); } }
+function editPrev(tx, fn){
+  if (!tx) return; const text=tx.textContent; let pos=caretIn(tx); if (pos===null) pos=text.length;
+  const before=text.slice(0,pos), after=text.slice(pos), g=lastGrapheme(before);
+  const parts=[...g.normalize('NFD')]; let L=parts.filter(isL).join(''), V=parts.filter(isV).join(''), T=parts.filter(isT).join('');
+  let rep=fn(L,V,T,g);
+  if (rep===null) return;
+  rep=rep.normalize('NFC'); const head=before.slice(0,before.length-g.length)+rep;
+  tx.textContent=head+after; setCaret(tx,head.length); tx.dispatchEvent(new Event('input'));
+}
+function oldVowel(tx){ editPrev(tx,(L,V,T,g)=> L ? L+(V==='ᆞ'?'ᆢ':'ᆞ')+T : g+'ᆞ'); }
+function okPress(kind,j){
+  const tx=curTx; if (!tx) return; tx.focus();
+  editPrev(tx,(L,V,T,g)=>{
+    if (!L) return g+j;                       // 앞이 한글이 아니면 그대로 넣기
+    if (kind==='L') return j+(V||'')+T;
+    if (kind==='V') return L+j+T;
+    return L+(V||'ᆞ')+j;                     // 끝소리
+  });
+}
+$('imeOn').addEventListener('change',e=>imeToggle(e.target.checked)); setTimeout(()=>imeToggle(IME.on),0);
+for (const k of ['L','V','T']) for (const j of OK[k]){
+  const b=document.createElement('button'); b.type='button'; b.textContent=j; b.title=(k==='L'?'첫소리 ':k==='V'?'가운뎃소리 ':'끝소리 ')+j;
+  b.addEventListener('mousedown',e=>e.preventDefault()); b.addEventListener('click',()=>okPress(k,j)); $('ok'+k).appendChild(b);
+}
+// ---------- 옛한글 자판 (두벌식 + 옛글자 규칙) ----------
+const IME={on:true, comp:null, tx:null, pos0:0, len:0, hist:[]};
+try { const v=localStorage.getItem('oldIME'); if (v!==null) IME.on=v==='1'; } catch(e){}
+const KM={KeyQ:['ㅂ','ㅃ'],KeyW:['ㅈ','ㅉ'],KeyE:['ㄷ','ㄸ'],KeyR:['ㄱ','ㄲ'],KeyT:['ㅅ','ㅆ'],KeyY:['ㅛ','ㅛ'],KeyU:['ㅕ','ㅕ'],KeyI:['ㅑ','ㅑ'],KeyO:['ㅐ','ㅒ'],KeyP:['ㅔ','ㅖ'],
+  KeyA:['ㅁ','ㅿ'],KeyS:['ㄴ','ㄴ'],KeyD:['ㅇ','ㆁ'],KeyF:['ㄹ','ㄹ'],KeyG:['ㅎ','ㆆ'],KeyH:['ㅗ','ㅗ'],KeyJ:['ㅓ','ㅓ'],KeyK:['ㅏ','ㆍ'],KeyL:['ㅣ','ㅣ'],
+  KeyZ:['ㅋ','ㅋ'],KeyX:['ㅌ','ㅌ'],KeyC:['ㅊ','ㅊ'],KeyV:['ㅍ','ㅍ'],KeyB:['ㅠ','ㅠ'],KeyN:['ㅜ','ㅜ'],KeyM:['ㅡ','ㅡ']};
+const CONS='ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎㅿㆁㆆ';
+const LOF={'ㄱ':'ᄀ','ㄲ':'ᄁ','ㄴ':'ᄂ','ㄷ':'ᄃ','ㄸ':'ᄄ','ㄹ':'ᄅ','ㅁ':'ᄆ','ㅂ':'ᄇ','ㅃ':'ᄈ','ㅅ':'ᄉ','ㅆ':'ᄊ','ㅇ':'ᄋ','ㅈ':'ᄌ','ㅉ':'ᄍ','ㅊ':'ᄎ','ㅋ':'ᄏ','ㅌ':'ᄐ','ㅍ':'ᄑ','ㅎ':'ᄒ','ㅿ':'ᅀ','ㆁ':'ᅌ','ㆆ':'ᅙ',
+  'ㅂㅇ':'ᄫ','ㅁㅇ':'ᄝ','ㅃㅇ':'ᄬ','ㅍㅇ':'ᅗ','ㅅㄱ':'ᄭ','ㅅㄷ':'ᄯ','ㅅㅂ':'ᄲ','ㅅㅈ':'ᄶ','ㅂㅅ':'ᄡ','ㅂㄷ':'ᄠ','ㅂㅈ':'ᄧ','ㅂㅌ':'ᄩ','ㅂㄱ':'ᄞ','ㅂㅅㄱ':'ᄢ','ㅂㅅㄷ':'ᄣ'};
+const TOF={'ㄱ':'ᆨ','ㄲ':'ᆩ','ㄴ':'ᆫ','ㄷ':'ᆮ','ㄹ':'ᆯ','ㅁ':'ᆷ','ㅂ':'ᆸ','ㅅ':'ᆺ','ㅆ':'ᆻ','ㅇ':'ᆼ','ㅈ':'ᆽ','ㅊ':'ᆾ','ㅋ':'ᆿ','ㅌ':'ᇀ','ㅍ':'ᇁ','ㅎ':'ᇂ','ㅿ':'ᇫ','ㆁ':'ᇰ','ㆆ':'ᇹ',
+  'ㄱㅅ':'ᆪ','ㄴㅈ':'ᆬ','ㄴㅎ':'ᆭ','ㄹㄱ':'ᆰ','ㄹㅁ':'ᆱ','ㄹㅂ':'ᆲ','ㄹㅅ':'ᆳ','ㄹㅌ':'ᆴ','ㄹㅍ':'ᆵ','ㄹㅎ':'ᆶ','ㅂㅅ':'ᆹ','ㄹㆆ':'ᇙ','ㄹㅿ':'ᇗ'};
+const VOF={'ㅏ':'ᅡ','ㅐ':'ᅢ','ㅑ':'ᅣ','ㅒ':'ᅤ','ㅓ':'ᅥ','ㅔ':'ᅦ','ㅕ':'ᅧ','ㅖ':'ᅨ','ㅗ':'ᅩ','ㅛ':'ᅭ','ㅜ':'ᅮ','ㅠ':'ᅲ','ㅡ':'ᅳ','ㅣ':'ᅵ','ㆍ':'ᆞ'};
+const VCOMB={'ᅩᅡ':'ᅪ','ᅩᅢ':'ᅫ','ᅩᅵ':'ᅬ','ᅮᅥ':'ᅯ','ᅮᅦ':'ᅰ','ᅮᅵ':'ᅱ','ᅳᅵ':'ᅴ','ᅡᅡ':'ᆞ','ᆞᅡ':'ᆢ','ᆞᆞ':'ᆢ','ᆞᅵ':'ᆡ'};
+const VDISP={'ᅡ':'ㅏ','ᅢ':'ㅐ','ᅣ':'ㅑ','ᅤ':'ㅒ','ᅥ':'ㅓ','ᅦ':'ㅔ','ᅧ':'ㅕ','ᅨ':'ㅖ','ᅩ':'ㅗ','ᅪ':'ㅘ','ᅫ':'ㅙ','ᅬ':'ㅚ','ᅭ':'ㅛ','ᅮ':'ㅜ','ᅯ':'ㅝ','ᅰ':'ㅞ','ᅱ':'ㅟ','ᅲ':'ㅠ','ᅳ':'ㅡ','ᅴ':'ㅢ','ᅵ':'ㅣ','ᆞ':'ㆍ','ᆡ':'ㆎ'};
+function imeRender(c){
+  if (!c) return '';
+  const L=c.L?LOF[c.L]:'', T=c.T?TOF[c.T]:'';
+  if (c.L && c.V) return (L+c.V+T).normalize('NFC');
+  if (c.L) return c.L.length===1 ? c.L : L+'ᅠ';
+  return VDISP[c.V] || ('ᅟ'+c.V);
+}
+function imeDraw(){
+  const tx=IME.tx; if (!tx) return; const t=tx.textContent, r=imeRender(IME.comp);
+  tx.textContent=t.slice(0,IME.pos0)+r+t.slice(IME.pos0+IME.len); IME.len=r.length; setCaret(tx,IME.pos0+r.length); tx.dispatchEvent(new Event('input'));
+}
+function imeCommit(){ IME.comp=null; IME.hist=[]; IME.len=0; }
+function imeStart(tx,c){
+  imeCommit(); IME.tx=tx; let p=caretIn(tx); if (p===null) p=tx.textContent.length; IME.pos0=p; IME.len=0; IME.comp=c; IME.hist=[]; imeDraw();
+}
+function imePush(c){ IME.hist.push(IME.comp); IME.comp=c; imeDraw(); }
+function imeNext(c){ const tx=IME.tx; IME.pos0+=IME.len; IME.len=0; IME.comp=c; IME.hist=[]; imeDraw(); }
+function imeKey(tx,s){
+  const c=IME.comp && IME.tx===tx ? IME.comp : null; const isC=CONS.includes(s);
+  if (!c){ imeStart(tx, isC?{L:s}:{V:VOF[s]}); return; }
+  if (isC){
+    if (!c.V){ if (c.L && LOF[c.L+s]) imePush({L:c.L+s}); else imeNext({L:s}); return; }
+    if (!c.T){ if (c.L && TOF[s]) imePush({...c,T:s}); else imeNext({L:s}); return; }
+    if (c.T.length===1 && TOF[c.T+s]) imePush({...c,T:c.T+s}); else imeNext({L:s});
+    return;
+  }
+  const v=VOF[s];
+  if (!c.V){ imePush({...c,V:v}); return; }
+  if (!c.T){ if (VCOMB[c.V+v]) imePush({...c,V:VCOMB[c.V+v]}); else imeNext({V:v}); return; }
+  // 받침 뒤에 모음: 마지막 자음을 다음 글자 첫소리로
+  const last=c.T.slice(-1), keep=c.T.slice(0,-1); IME.hist.push(IME.comp); IME.comp={...c,T:keep||undefined}; if (!keep) delete IME.comp.T; imeDraw(); imeNext({L:last,V:v});
+}
+function imeBack(){
+  if (!IME.comp) return false;
+  if (IME.hist.length){ IME.comp=IME.hist.pop(); imeDraw(); }
+  else { IME.comp=null; imeDraw(); imeCommit(); }
+  return true;
+}
+function imeKeydown(e, tx){
+  if (!IME.on || e.ctrlKey || e.altKey || e.metaKey) { imeCommit(); return; }
+  if (e.key==='Process' || e.isComposing){ $('imeWarn').hidden=false; return; }
+  const m=KM[e.code];
+  if (m){ e.preventDefault(); $('imeWarn').hidden=true; imeKey(tx, m[e.shiftKey?1:0]); return; }
+  if (e.key==='Backspace'){ if (imeBack()) e.preventDefault(); return; }
+  if (e.key.length===1 || ['Enter','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Delete','Escape'].includes(e.key)) imeCommit();
+}
+function imeToggle(on){ IME.on=on; imeCommit(); try{ localStorage.setItem('oldIME',on?'1':'0'); }catch(e){} $('imeOn').checked=on; $('imeHelp').hidden=!on; $('imeWarn').hidden=true; }
+
+function select(k, scroll){
+  active=k;
+  document.querySelectorAll('.facs rect').forEach(r=>r.classList.toggle('on', +r.dataset.k===k));
+  document.querySelectorAll('.lines li').forEach(li=>li.classList.toggle('on', +li.dataset.k===k));
+  if (scroll){ const li=document.querySelector(`.lines li[data-k="${k}"]`); if (li){ li.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'}); li.querySelector('.tx').focus({preventScroll:true}); } }
+}
+function renderEditInfo(){
+  const n = state.pages.reduce((a,p)=>a+p.lines.filter(l=>l.text!==l.orig).length,0);
+  $('editInfo').textContent = n ? `고친 행 ${n}개` : '';
+}
+const esc = (s)=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- 내보내기 ----------
+function pageText(P){ return `## ${P.no}쪽\n` + (P.status==='empty' ? '(본문 없음)\n' : P.status==='nomatch' ? '(본문을 찾지 못함: 표지·빈 면·훼손 면일 수 있음)\n' + P.lines.map(l=>l.text).join('\n')+'\n' : P.lines.map(l=>l.text).join('\n')+'\n'); }
+function allText(){
+  const d=new Date(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const n = state.pages.reduce((a,p)=>a+p.lines.filter(l=>l.text!==l.orig).length,0);
+  return `# ${state.name} 자동 판독 (방각본 판독기 ${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''})\n# 오른쪽 행부터 차례로, 한 줄 = 판본 한 행\n# 판독일 ${ds}${n?`, 사람이 고친 행 ${n}개`:''}\n\n` + state.pages.map(pageText).join('\n');
+}
+async function copyText(t, okMsg){
+  try { await navigator.clipboard.writeText(t); setMsg(okMsg); }
+  catch(e){ const box=$('copybox'); box.hidden=false; box.value=t; box.focus(); box.select(); setMsg('자동 복사가 막혀 있어 아래 칸에 전체를 선택해 두었습니다. Ctrl+C(⌘+C)로 복사하세요.'); }
+}
+// ---------- 학습용으로 보내기 ----------
+let DB=null, ASSETS=null, UID=null, SENT=new Map();
+function fnv(str){ let h=0x811c9dc5; for (const ch of str){ h^=ch.codePointAt(0); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }
+const pageKey=(P)=>'f'+state.fileKey+'-p'+P.no;
+const sentDoc=(P)=>(!P.sample && state.fileKey) ? SENT.get(pageKey(P)) : null;
+function renderTrain(){
+  const P=state.pages[state.cur], bar=$('trainbar');
+  const ok = DB && ASSETS && P && !P.sample && P.status!=='empty' && P.lines.length && !state.running;
+  bar.hidden=!ok;
+  if (ok){
+    const d=sentDoc(P), n=P.lines.filter(l=>l.text!==l.orig).length;
+    $('sendTrain').textContent = d ? '고친 내용으로 다시 보내기' : '검수 끝, 학습용으로 보내기';
+    $('trainHint').innerHTML = d ? `<span class="done">학습용으로 보냈습니다</span> (${new Date(d.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}, 고친 행 ${d.lines.filter(l=>l.text!==l.orig).length}개). 더 고쳤다면 다시 보내 주세요.`
+      : `모든 행을 확인한 뒤 보내 주세요. <b>고치지 않은 행도 맞는 것으로 학습</b>합니다. 읽을 수 없는 글자는 □로 적어 주세요.${n?` 지금 고친 행 ${n}개.`:''}`;
+  }
+  if (DB){ let pages=0, lines=0; for (const d of SENT.values()){ pages++; lines+=(d.lines||[]).length; } $('trainCount').textContent = pages ? `학습용으로 모은 면 ${pages}면, 행 ${lines}개` : ''; }
+}
+async function sendTrain(){
+  const P=state.pages[state.cur]; if (!P || !DB || !ASSETS || P.sample) return;
+  const btn=$('sendTrain'); btn.disabled=true; setMsg(`${P.no}쪽을 학습용으로 보내는 중…`);
+  try {
+    const key=pageKey(P), prev=SENT.get(key);
+    let image = P.imageId || (prev && prev.image);
+    if (!image){ const r=await ASSETS.upload(P.full,{type:'image/jpeg'}); image=r.id; }
+    P.imageId=image;
+    const doc={src:state.name, page:P.no, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
+      lines:P.lines.map(l=>({orig:l.orig,text:l.text})), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
+    await DB.collection('training').doc(key).set(doc);
+    SENT.set(key, doc); renderPages();
+    setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개.`);
+  } catch(e){
+    const c=e&&e.code;
+    if (c==='quota_exceeded'||c==='quota_or_state') setMsg('학습 자료 저장 공간이 찼습니다. 김강은 선생님께 알려 주세요.', true);
+    else if (c==='not_granted'||c==='invalid_argument') setMsg('이 계정은 학습 자료를 보낼 권한이 없습니다. 판독기 공유 설정에서 기여자 이상 권한이 필요합니다.', true);
+    else setMsg('보내지 못했습니다. 잠시 뒤 다시 눌러 주세요. ('+(c||e)+')', true);
+  } finally { btn.disabled=false; renderTrain(); }
+}
+$('sendTrain').onclick=sendTrain;
+(async()=>{
+  if (!(window.claude && window.claude.use)) return;
+  try { const u=await claude.use('user'); UID = u ? await u.id() : null; } catch(e){}
+  try { ASSETS=await claude.use('assets'); } catch(e){ ASSETS=null; }
+  try { DB=await claude.use('db'); } catch(e){ DB=null; }
+  if (DB){
+    try { DB.collection('training').onSnapshot(snap=>{ SENT=new Map(snap.docs.map(d=>[d.id,d.data()])); renderTrain(); renderPages(); }, ()=>{}); } catch(e){}
+  }
+  renderTrain();
+})();
+$('copyPage').onclick=()=>{ const P=state.pages[state.cur]; if (P) copyText(P.lines.map(l=>l.text).join('\n'), `${P.no}쪽 판독문을 복사했습니다.`); };
+$('copyAll').onclick=()=>copyText(allText(), '전체 판독문을 복사했습니다.');
+let downloads=null;
+$('saveAll').onclick=async()=>{
+  if (!downloads){ if (!CFG.github) return; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([allText()],{type:'text/plain;charset=utf-8'})); a.download=`${state.name||'판독'}_자동판독.txt`; document.body.appendChild(a); a.click(); a.remove(); setMsg('텍스트 파일로 저장했습니다.'); return; }
+  try { await downloads.save({filename:`${state.name||'판독'}_자동판독.txt`, data:allText()}); setMsg('텍스트 파일로 저장했습니다.'); }
+  catch(e){ if (e && e.code==='declined') setMsg('저장을 취소했습니다.'); else setMsg('여기서는 파일 저장을 쓸 수 없습니다. 전체 복사를 쓰세요.', true); }
+};
+(async()=>{ try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch(e){ downloads=null; } $('saveAll').hidden=!(downloads||CFG.github); })();
+
+// ---------- 조작 ----------
+function pick(f){ if (!f) return; state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
+$('file').addEventListener('change',e=>pick(e.target.files[0]));
+const drop=$('drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop',e=>pick(e.dataTransfer.files[0]));
+$('go').onclick=run;
+$('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
+$('vert').onclick=()=>{ state.vert=!state.vert; $('vert').setAttribute('aria-pressed',state.vert); $('vert').textContent=state.vert?'가로로 보기':'세로로 대조'; renderCurrent(); };
+
+// ---------- 예시 면 ----------
+state.name = SAMPLE.name; state.useLM = !!CFG.lm;
+state.pages = [{sample:true, no:SAMPLE.no, W:SAMPLE.W, H:SAMPLE.H, t:SAMPLE.t, bt:SAMPLE.bt, cols:SAMPLE.cols, status:'ok', url:'sample.jpg', lines:SAMPLE.lines.map(s=>({text:s,orig:s}))}];
+renderAll();
+$('facsTitle').textContent='예시 · '+SAMPLE.title;
+</script>
+</body></html>

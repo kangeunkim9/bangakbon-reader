@@ -163,7 +163,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <h1>방각본 판독기</h1>
     <span class="tag" id="ver">시험판 · 판독 모델 7차 · 2026.11</span>
     <p>방각본 한글 소설의 면 사진을 판본 행 그대로 텍스트로 옮깁니다.</p>
-    <p class="by">만든 사람 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> · 성균관대학교 국어국문학과 BK 교육연구단</p>
+    <p class="by">성균관대학교 국어국문학과 고전소설 연구실</p>
   </header>
 
   <section class="teach" id="teach" hidden aria-label="판독기 함께 가르치기">
@@ -266,7 +266,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 창을 닫으면 사라지니 저장하거나 복사해 두세요.</p>
       <p>검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
     </div>
-        <p class="credit">기획·제작 <a href="https://kangeunkim9.github.io" target="_blank" rel="noopener">김강은</a> (성균관대학교 국어국문학과 BK 교육연구단 연구교수). 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 학습용 전사는 국립국어원이 제공하는 KOHICO(국어 역사 말뭉치)를 썼습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
+        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 학습용 전사는 국립국어원이 제공하는 KOHICO(국어 역사 말뭉치)를 썼습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
   </section>
 </div>
 
@@ -560,7 +560,7 @@ window.KP = KP;
 const CFG = {
   model: ['model_v7_0.wasm','model_v7_1.wasm','model_v7_2.wasm','model_v7_3.wasm'], modelLabel: '7차 모델',
   lm: null, charset: 'charset_v7.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
-  approxMB: 45, github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
+  approxMB: 45, github: true, minConf: 0.85, lineConf: 0.97, inbox: "", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
@@ -1049,7 +1049,7 @@ async function sendTrain(){
     setMsg(`${P.no}쪽을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.text!==l.orig).length}개.`);
   } catch(e){
     const c=e&&e.code;
-    if (c==='quota_exceeded'||c==='quota_or_state') setMsg('학습 자료 저장 공간이 찼습니다. 김강은 선생님께 알려 주세요.', true);
+    if (c==='quota_exceeded'||c==='quota_or_state') setMsg('학습 자료 저장 공간이 찼습니다. 고전소설 연구실에 알려 주세요.', true);
     else if (c==='not_granted'||c==='invalid_argument') setMsg('이 계정은 학습 자료를 보낼 권한이 없습니다. 판독기 공유 설정에서 기여자 이상 권한이 필요합니다.', true);
     else setMsg('보내지 못했습니다. 잠시 뒤 다시 눌러 주세요. ('+(c||e)+')', true);
   } finally { btn.disabled=false; renderTrain(); }

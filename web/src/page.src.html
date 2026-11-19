@@ -801,7 +801,7 @@ $('randomPage').onclick=async()=>{
   } catch(e){ setMsg('면을 가져오지 못했습니다. 잠시 뒤 다시 눌러 주세요.', true); }
   finally { btn.disabled=false; }
 };
-if (CFG.github) $('randomPage').hidden=false;
+if (CFG.github && CFG.randomOn) $('randomPage').hidden=false;
 $('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
 $('vert').onclick=()=>{ state.vert=!state.vert; $('vert').setAttribute('aria-pressed',state.vert); $('vert').textContent=state.vert?'가로로 보기':'세로로 대조'; renderCurrent(); };
 

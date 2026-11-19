@@ -1034,7 +1034,7 @@ async function preBook(title){
   if (!CFG.github) return null;
   try {
     if (!PREIDX) PREIDX=fetch('pre/index.json').then(r=>r.ok?r.json():{books:{}}).catch(()=>({books:{}}));
-    const stem=title.replace(/^File:/,'').replace(/\.pdf$/i,''), ix=await PREIDX;
+    const stem=title.replace(/^File:/,'').replace(/\.pdf$/i,'').normalize('NFC'), ix=await PREIDX;
     if (!ix.books || !ix.books[stem]) return null;
     if (!PREBOOK[stem]) PREBOOK[stem]=fetch('pre/'+encodeURIComponent(stem)+'.json').then(r=>r.ok?r.json():null).catch(()=>null);
     const d=await PREBOOK[stem]; return d && d.format==='bangakbon-ocr' && Array.isArray(d.pages) ? d : null;

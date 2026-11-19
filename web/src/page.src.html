@@ -105,6 +105,12 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .facs svg rect.on{fill:var(--accent-soft);stroke-width:3}
 .facs svg text{font:600 26px var(--f-mono);fill:var(--box);paint-order:stroke;stroke:var(--surface);stroke-width:6px;text-anchor:middle;pointer-events:none}
 .facs .none{padding:40px 16px;text-align:center;color:var(--muted)}
+/* 판독문을 아래로 내려도 판본 사진이 화면에 남도록: 넓은 화면에서는 사진 쪽 판을 붙여 두고 화면 높이에 맞춘다 */
+@media (min-width:821px){
+  .bench>.panel:first-child{position:sticky;top:12px}
+  .facs .stage{width:fit-content;max-width:100%;margin:0 auto}
+  .facs img{width:auto;max-width:100%;max-height:calc(100vh - 90px)}
+}
 .lines{list-style:none;margin:0;padding:6px 0;counter-reset:ln}
 .lines li{display:grid;grid-template-columns:2.4em minmax(0,1fr) auto;gap:6px;padding:5px 14px;border-left:3px solid transparent;align-items:baseline}
 .lines li.on{background:var(--accent-soft);border-left-color:var(--accent)}

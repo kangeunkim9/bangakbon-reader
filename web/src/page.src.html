@@ -774,11 +774,11 @@ const EXAMPLES=[
   ['File:CNTS-00047982704 장한졀효기.pdf','장한절효기'],['File:홍길동전.pdf','홍길동전'],['File:CNTS-00082399730 3 황운젼.pdf','황운전 3'],['File:CNTS-00082399730 1 황운젼.pdf','황운전 1'],
   ['File:CNTS-00109637790 금향졍긔 이종. 권하.pdf','금향졍긔 권하'],['File:CNTS-00109637790 금향졍긔 이종. 권하.pdf','금향졍긔 권하'],
   ['File:CNTS-00060574842 월봉긔. 일- -著者未詳-.pdf','월봉긔 1']];
-async function commonsPage(title){
+async function commonsPage(title, want){
   const api=q=>fetch('https://commons.wikimedia.org/w/api.php?'+new URLSearchParams({...q,format:'json',origin:'*'})).then(r=>r.json());
   const j=await api({action:'query',titles:title,prop:'imageinfo',iiprop:'size|url',iiurlwidth:'500',iiurlparam:'page3-500px'});
   const ii=Object.values(j.query.pages)[0].imageinfo[0], n=ii.pagecount||1;
-  const page=3+Math.floor(Math.random()*Math.max(1,n-4));            // 표지와 끝 면은 빼고
+  const page=want ? Math.min(n,Math.max(1,want)) : 3+Math.floor(Math.random()*Math.max(1,n-4));            // 표지와 끝 면은 빼고
   const url=ii.thumburl.replace(/page\d+-\d+px/g,'page'+page+'-1920px');
   const bm=await createImageBitmap(await (await fetch(url)).blob());
   const s=Math.min(1,1500/bm.width), c=document.createElement('canvas'); c.width=Math.round(bm.width*s); c.height=Math.round(bm.height*s);
@@ -786,12 +786,11 @@ async function commonsPage(title){
   const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
   return {blob, page, descr:ii.descriptionurl};
 }
-$('randomPage').onclick=async()=>{
+async function openCommons(title,name,want){
   if (state.running) return; const btn=$('randomPage'); btn.disabled=true;
   try {
-    const [title,name]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)];
     setMsg(`위키미디어 공용에서 ${name} 한 면을 가져오는 중…`);
-    const {blob,page,descr}=await commonsPage(title);
+    const {blob,page,descr}=await commonsPage(title,want);
     const f=new File([blob],`${name} ${page}쪽.jpg`,{type:'image/jpeg'}); f.srcPage=page; f.srcName=name;
     state.commons=title; pick(f);
     $('fname').innerHTML=''; const a=document.createElement('a'); a.href=descr; a.target='_blank'; a.rel='noopener'; a.textContent=`위키미디어 공용 · ${name} ${page}쪽 (국립중앙도서관 소장본)`; $('fname').appendChild(a);
@@ -800,8 +799,12 @@ $('randomPage').onclick=async()=>{
     else setMsg('본문이 없는 면이 걸렸습니다. 한 번 더 눌러 주세요.');
   } catch(e){ setMsg('면을 가져오지 못했습니다. 잠시 뒤 다시 눌러 주세요.', true); }
   finally { btn.disabled=false; }
-};
+}
+$('randomPage').onclick=()=>{ const [title,name]=EXAMPLES[Math.floor(Math.random()*EXAMPLES.length)]; openCommons(title,name); };
 if (CFG.github && CFG.randomOn) $('randomPage').hidden=false;
+// 주소로 특정 면 열기: ?f=File:...pdf&p=쪽&n=이름
+(()=>{ if (!CFG.github) return; const q=new URLSearchParams(location.search), f=q.get('f'), pg=+q.get('p');
+  if (f && /^File:[^\/]+\.pdf$/i.test(f) && pg>0) setTimeout(()=>openCommons(f, (q.get('n')||f.replace(/^File:|\.pdf$/gi,'')).slice(0,40), pg), 300); })();
 $('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
 $('vert').onclick=()=>{ state.vert=!state.vert; $('vert').setAttribute('aria-pressed',state.vert); $('vert').textContent=state.vert?'가로로 보기':'세로로 대조'; renderCurrent(); };
 

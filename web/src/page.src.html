@@ -66,6 +66,8 @@ button:disabled{opacity:.5;cursor:default}
 a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .teach .count{font-size:.8rem;color:var(--muted)}
 .intake{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+.resume{grid-column:1/-1;background:var(--accent-soft);border-radius:8px;padding:8px 12px;font-size:.9rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.resume[hidden]{display:none}
 .drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;min-height:84px;background:var(--bg)}
 .drop.over{border-color:var(--accent);background:var(--accent-soft)}
 .drop input{position:absolute;opacity:0;width:1px;height:1px}
@@ -218,6 +220,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <button id="trySample" type="button">예시 면으로 해 보기</button>
     </div>
     <div class="status">
+      <div class="resume" id="resume" hidden><span id="resumeTxt"></span> <button type="button" class="primary" id="resumeGo">이어서 하기</button> <button type="button" id="resumeNew">처음부터 다시</button></div>
       <div class="msg" id="msg" role="status">예시 면을 보여 드리고 있습니다. 자료를 고르면 판독을 시작할 수 있습니다.</div>
       <div class="bar" aria-hidden="true"><i id="barI"></i></div>
     </div>
@@ -252,6 +255,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 
   <section class="foot">
     <button class="primary" id="saveAll" hidden>텍스트 파일로 저장</button>
+    <button id="saveJson" hidden title="다른 컴퓨터에서 이어서 하거나 보관할 때. PDF와 함께 다시 넣으면 그대로 불러옵니다">결과 파일(.json) 저장</button>
     <button id="copyAll">전체 복사</button>
     <small id="editInfo"></small>
     <small id="trainCount"></small>
@@ -437,20 +441,20 @@ async function run(){
     let eng = state.imp ? null : await loadEngine(useLM);   // 미리 판독한 결과만 띄울 때는 엔진을 받지 않는다
     state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
     const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
-    for await (let [no,g,side,iq] of halves(pagesOf(state.file,a,b))){
+    for await (let [no,g,side,iq,meta] of halves(pagesOf(state.file,a,b))){
       g = KP.normWidth(g); const lab = no+'쪽'+(side?' '+side:'');
       if (state.stop) break;
       if (iq){   // Colab에서 미리 판독한 결과가 있으면 다시 읽지 않는다
         const sc=g.w/(iq.W||g.w);
-        const P = {no: state.file.srcPage||no, side, W:g.w, H:g.h, t:Math.round(iq.t*sc), bt:Math.round(iq.bt*sc), cols:(iq.cols||[]).map(([x0,x1])=>[Math.round(x0*sc),Math.round(x1*sc)]),
-          lines:(iq.lines||[]).map(t=>({text:t, orig:t})), conf:iq.conf||[], status:iq.status||'ok', url: await previewURL(g), full: await fullJPEG(g)};
+        const P = {no: state.file.srcPage||no, side, ...meta, W:g.w, H:g.h, t:Math.round(iq.t*sc), bt:Math.round(iq.bt*sc), cols:(iq.cols||[]).map(([x0,x1])=>[Math.round(x0*sc),Math.round(x1*sc)]),
+          lines:(iq.lines||[]).map(t=>typeof t==='string' ? {text:t, orig:t} : {...t}), conf:iq.conf||[], status:iq.status||'ok', note:iq.note||'', reveal:!!iq.reveal, url: await previewURL(g), full: await fullJPEG(g)};
         state.pages.push(P); if (state.pages.length===1) state.cur=0;
-        done++; setMsg(`${lab} 불러옴 (Colab 판독 결과)`); setBar(done/(state.total||1)); renderPages(); if (state.cur===state.pages.length-1) renderCurrent(); await idle(); continue;
+        done++; setMsg(`${lab} 불러옴 (${state.imp.resumed?'저장해 둔 결과':'미리 판독한 결과'})`); setBar(done/(state.total||1)); renderPages(); if (state.cur===state.pages.length-1) renderCurrent(); await idle(); continue;
       }
       if (!eng) eng = await loadEngine(useLM);
       setMsg(`${lab} 행 나누는 중…`); await idle();
       let seg; try { seg = KP.segment(g); } catch(e){ seg = {t:0,bt:g.h,cols:[]}; }
-      const P = {no: state.file.srcPage||no, side, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
+      const P = {no: state.file.srcPage||no, side, ...meta, W:g.w, H:g.h, t:seg.t, bt:seg.bt, cols:seg.cols, lines:[], status:'ok', url: await previewURL(g), full: await fullJPEG(g)};
       state.pages.push(P); const idx=state.pages.length-1;
       if (seg.cols.length<6){ P.status='empty'; P.cols=[]; }
       else {
@@ -482,7 +486,7 @@ async function run(){
         const avgConf = P.conf && P.conf.length ? P.conf.reduce((u,v)=>u+v,0)/P.conf.length : 1;
         if (P.lines.length && (median(P.lines.map(l=>KP.graphemes(l.text)))<8 || avgConf<0.55)) P.status='nomatch';
       }
-      done++; renderPages(); if (state.cur===idx) renderCurrent();
+      done++; state.dirty=true; renderPages(); if (state.cur===idx) renderCurrent();
     }
     const nOK = state.pages.filter(p=>p.status==='ok').length;
     setMsg(`${state.stop?'멈춤. ':''}${state.pages.length}쪽 가운데 본문 ${nOK}면 판독 완료 (${fmtTime((performance.now()-t0)/1000)}). 판독문을 고친 뒤 저장하세요.`);
@@ -498,9 +502,11 @@ async function* halves(gen){ for await (const [no,g] of gen){
   const ip = state.imp ? state.imp.pages.filter(q=>q.no===no) : [];
   if (ip.length){   // 미리 판독한 결과: 그때 나눈 자리 그대로 자른다
     const sc = g.w/(ip[0].srcW||g.w);
-    for (const q of ip){ yield [no, q.split ? cropX(g, Math.round(q.split[0]*sc), Math.round(q.split[1]*sc)) : g, q.side||'', q]; }
+    for (const q of ip){ yield [no, q.split ? cropX(g, Math.round(q.split[0]*sc), Math.round(q.split[1]*sc)) : g, q.side||'', q, {split:q.split||null, srcW:q.srcW||g.w}]; }
     continue; }
-  const parts=KP.splitSpread(g); if (parts.length<2) yield [no,g,'']; else { yield [no,parts[0],'오른쪽']; yield [no,parts[1],'왼쪽']; } } }
+  const parts=KP.splitSpread(g);
+  if (parts.length<2) yield [no,g,'',null,{split:null, srcW:g.w}];
+  else { const x=g.w-parts[0].w; yield [no,parts[0],'오른쪽',null,{split:[x,g.w], srcW:g.w}]; yield [no,parts[1],'왼쪽',null,{split:[0,x], srcW:g.w}]; } } }
 function cropX(g,x0,x1){ x0=Math.max(0,x0); x1=Math.min(g.w,x1); const w=x1-x0, d=new Uint8Array(w*g.h); for (let y=0;y<g.h;y++) d.set(g.d.subarray(y*g.w+x0, y*g.w+x1), y*w); return {w, h:g.h, d}; }
 function plab(P){ return P.no+'쪽'+(P.side?' '+P.side:''); }
 function fmtTime(s){ s=Math.max(1,Math.round(s)); return s<60 ? s+'초' : Math.floor(s/60)+'분 '+(s%60)+'초'; }
@@ -555,7 +561,7 @@ function renderCurrent(partial){
   add.onclick=()=>{ P.lines.push({text:'',orig:'',added:true}); renderCurrent(); const li=body.querySelector(`.lines li[data-k="${P.lines.length-1}"] .tx`); if (li){ if (IME.on) focusLine(li,0); else li.focus(); } renderEditInfo(); };
   const lab=document.createElement('label'); lab.className='note'; lab.innerHTML='<span>비고</span>';
   const ta=document.createElement('textarea'); ta.rows=2; ta.placeholder='행 나누기가 틀린 곳, 빠진 행의 위치, 훼손·판독 불가 등 남길 말'; ta.value=P.note||'';
-  ta.addEventListener('input',()=>{ P.note=ta.value; }); lab.appendChild(ta);
+  ta.addEventListener('input',()=>{ P.note=ta.value; state.dirty=true; }); lab.appendChild(ta);
   tools.append(add,lab); body.appendChild(tools);
   if (active>=0) select(active,false);
 }
@@ -770,6 +776,7 @@ function select(k, scroll){
   if (scroll){ const li=document.querySelector(`.lines li[data-k="${k}"]`); if (li){ li.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'}); const t=li.querySelector('.tx'); if (IME.on) focusLine(t); else t.focus({preventScroll:true}); } }
 }
 function renderEditInfo(){
+  state.dirty=true;
   const n = state.pages.reduce((a,p)=>a+p.lines.filter(lchg).length,0);
   $('editInfo').textContent = n ? `고친 행 ${n}개` : '';
 }
@@ -874,13 +881,43 @@ $('sendTrain').onclick=sendTrain;
 })();
 $('copyPage').onclick=()=>{ const P=state.pages[state.cur]; if (P) copyText(live(P).map(l=>l.text).join('\n'), `${plab(P)} 판독문을 복사했습니다.`); };
 $('copyAll').onclick=()=>copyText(allText(), '전체 판독문을 복사했습니다.');
+// ---------- 읽은 결과 보관: 브라우저에 자동 저장, 같은 파일을 다시 넣으면 이어서 ----------
+function snapshot(){
+  const pages=state.pages.filter(P=>!P.sample).map(P=>({no:P.no, side:P.side||'', split:P.split||null, srcW:P.srcW||P.W, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols,
+    lines:P.lines.map(l=>{ const o={text:l.text, orig:l.orig}; if (l.removed) o.removed=true; if (l.added) o.added=true; return o; }), conf:P.conf||[], status:P.status, note:P.note||'', reveal:!!P.reveal}));
+  return {format:'bangakbon-ocr', version:1, src:state.name, model:CFG.modelLabel, made:new Date().toISOString(), fileKey:state.fileKey, pages};
+}
+const IDB={ db:null,
+  open(){ return this.db || (this.db=new Promise((res,rej)=>{ try { const r=indexedDB.open('bangakbon',1); r.onupgradeneeded=()=>r.result.createObjectStore('books'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); } catch(e){ rej(e); } })); },
+  async get(k){ try { const db=await this.open(); return await new Promise((res,rej)=>{ const q=db.transaction('books').objectStore('books').get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); } catch(e){ return null; } },
+  async set(k,v){ try { const db=await this.open(); await new Promise((res,rej)=>{ const t=db.transaction('books','readwrite'); t.objectStore('books').put(v,k); t.oncomplete=res; t.onerror=()=>rej(t.error); }); return true; } catch(e){ return false; } } };
+setInterval(async()=>{
+  if (!state.dirty || !state.fileKey || !state.pages.some(P=>!P.sample)) return;
+  state.dirty=false; await IDB.set(state.fileKey, snapshot());
+}, 4000);
+async function offerResume(f){
+  $('resume').hidden=true; state.resume=null;
+  const k=fnv(f.name+'|'+f.size), d=await IDB.get(k);
+  if (!d || !d.pages || !d.pages.length || state.file!==f) return;
+  const n=d.pages.length, ed=d.pages.reduce((a,q)=>a+(q.lines||[]).filter(l=>typeof l==='object' && (l.removed||l.added||l.text!==l.orig)).length,0);
+  $('resumeTxt').textContent=`이 파일은 전에 ${n}면까지 읽었습니다(${new Date(d.made).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}, 고친 행 ${ed}개).`;
+  state.resume=d; $('resume').hidden=false;
+}
+$('resumeGo').onclick=()=>{ if (!state.resume) return; state.imp={...state.resume, resumed:true}; $('resume').hidden=true; $('p0').value=1; $('p1').value=0; run(); };
+$('resumeNew').onclick=()=>{ state.resume=null; state.imp=null; $('resume').hidden=true; setMsg('처음부터 다시 읽습니다. 판독 시작을 누르세요. 저장해 둔 결과는 새로 읽은 결과로 바뀝니다.'); };
+$('saveJson').onclick=async()=>{
+  const data=JSON.stringify(snapshot()), name=`${state.name||'판독'}_판독결과.json`;
+  if (downloads){ try { await downloads.save({filename:name, data}); setMsg('결과 파일을 저장했습니다. 나중에 같은 PDF와 함께 넣으면 그대로 불러옵니다.'); } catch(e){ setMsg(e&&e.code==='declined'?'저장을 취소했습니다.':'여기서는 파일 저장을 쓸 수 없습니다.', true); } return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'application/json'})); a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setMsg('결과 파일을 저장했습니다. 나중에 같은 PDF와 함께 넣으면 그대로 불러옵니다.');
+};
 let downloads=null;
 $('saveAll').onclick=async()=>{
   if (!downloads){ if (!CFG.github) return; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([allText()],{type:'text/plain;charset=utf-8'})); a.download=`${state.name||'판독'}_자동판독.txt`; document.body.appendChild(a); a.click(); a.remove(); setMsg('텍스트 파일로 저장했습니다.'); return; }
   try { await downloads.save({filename:`${state.name||'판독'}_자동판독.txt`, data:allText()}); setMsg('텍스트 파일로 저장했습니다.'); }
   catch(e){ if (e && e.code==='declined') setMsg('저장을 취소했습니다.'); else setMsg('여기서는 파일 저장을 쓸 수 없습니다. 전체 복사를 쓰세요.', true); }
 };
-(async()=>{ try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch(e){ downloads=null; } $('saveAll').hidden=!(downloads||CFG.github); })();
+(async()=>{ try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch(e){ downloads=null; } $('saveAll').hidden=$('saveJson').hidden=!(downloads||CFG.github); })();
 
 // ---------- 조작 ----------
 async function pickFiles(fs){
@@ -896,7 +933,7 @@ async function pickFiles(fs){
     if (state.imp.src && state.file && !state.file.name.replace(/\.pdf$/i,'').includes(String(state.imp.src).replace(/\.pdf$/i,'').slice(-12))) setMsg(`결과 파일은 「${state.imp.src}」의 것입니다. 넣은 PDF가 같은 책인지 확인해 주세요.`, true);
   }
 }
-function pick(f){ if (!f) return; if (!f.srcPage) state.commons=''; else state.imp=null; state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
+function pick(f){ if (!f) return; if (!f.srcPage) state.commons=''; else state.imp=null; setTimeout(()=>{ if (!state.imp && !f.srcPage) offerResume(f); },0); state.file=f; $('fname').textContent=f.name+' · '+(f.size/1e6).toFixed(1)+'MB'; $('go').disabled=state.running; setMsg('준비됐습니다. 쪽 범위를 확인하고 판독 시작을 누르세요.'); }
 $('file').addEventListener('change',e=>pickFiles(e.target.files));
 const drop=$('drop');
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));

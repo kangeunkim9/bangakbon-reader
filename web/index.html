@@ -505,7 +505,7 @@ window.KP = KP;
 const CFG = {
   model: ['model_v5_0.wasm','model_v5_1.wasm','model_v5_2.wasm'], modelLabel: '5차 모델',
   lm: null, charset: 'charset.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
-  approxMB: 45, github: true, inbox: "", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
+  approxMB: 45, github: true, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }

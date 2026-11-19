@@ -138,6 +138,9 @@ def read_face(R, im, no, side, split, srcW, srcH):
     if len(cols) < 6: q.update(cols=[], lines=[], conf=[], status='empty'); return q
     arrs = [prep_arr(im.crop((max(0, a - 3), t, c + 3, bt))) for a, c in cols]
     out = R.read(arrs); q['lines'] = [s for s, _ in out]; q['conf'] = [round(c, 3) for _, c in out]
+    for k in (-1, 0):   # 판 가장자리에 붙은 짧고 흐린 행(테두리·얼룩)은 뺀다
+        if len(q['lines']) > 6 and len(G(q['lines'][k])) < 3 and q['conf'][k] < 0.6:
+            q['lines'].pop(k); q['conf'].pop(k); q['cols'].pop(k)
     lens = [len(G(s)) for s in q['lines']]
     cover = all(n < 3 for n in lens[:6]); avg = sum(q['conf']) / len(q['conf'])
     q['status'] = 'nomatch' if (cover or float(np.median(lens)) < 8 or avg < 0.55) else 'ok'

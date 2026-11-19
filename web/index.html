@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>방각본 판독기</title>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>방각본 고전소설 판독기</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -175,7 +175,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 
 <div class="wrap">
   <header class="head">
-    <h1>방각본 판독기</h1>
+    <h1>방각본 고전소설 판독기</h1>
     <span class="tag" id="ver">시험판 · 판독 모델 8차 · 2026.11</span>
     <button class="reportbtn" id="reportOpen" type="button" aria-expanded="false">문제 알리기</button>
     <p class="by">성균관대학교 국어국문학과 고전소설 연구실</p>
@@ -1097,7 +1097,7 @@ function pageText(P){ return `## ${plab(P)}\n` + (P.status==='empty' ? '(본문 
 function allText(){
   const d=new Date(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const n = state.pages.reduce((a,p)=>a+p.lines.filter(lchg).length,0);
-  return `# ${state.name} 자동 판독 (방각본 판독기 ${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''})\n# 오른쪽 행부터 차례로, 한 줄 = 판본 한 행\n# 판독일 ${ds}${n?`, 사람이 고친 행 ${n}개`:''}\n\n` + state.pages.map(pageText).join('\n');
+  return `# ${state.name} 자동 판독 (방각본 고전소설 판독기 ${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''})\n# 오른쪽 행부터 차례로, 한 줄 = 판본 한 행\n# 판독일 ${ds}${n?`, 사람이 고친 행 ${n}개`:''}\n\n` + state.pages.map(pageText).join('\n');
 }
 async function copyText(t, okMsg){
   try { await navigator.clipboard.writeText(t); setMsg(okMsg); }
@@ -1336,13 +1336,32 @@ async function commonsPage(title, want){
   const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
   return {blob, page, descr:ii.descriptionurl};
 }
+// 미리 판독한 결과 (Colab에서 책 단위로 읽어 pre/ 폴더에 올려 둔 것). 있으면 엔진 없이 바로 띄운다.
+let PREIDX=null; const PREBOOK={};
+async function preBook(title){
+  if (!CFG.github) return null;
+  try {
+    if (!PREIDX) PREIDX=fetch('pre/index.json').then(r=>r.ok?r.json():{books:{}}).catch(()=>({books:{}}));
+    const stem=title.replace(/^File:/,'').replace(/\.pdf$/i,'').normalize('NFC'), ix=await PREIDX;
+    if (!ix.books || !ix.books[stem]) return null;
+    if (!PREBOOK[stem]) PREBOOK[stem]=fetch('pre/'+encodeURIComponent(stem)+'.json').then(r=>r.ok?r.json():null).catch(()=>null);
+    const d=await PREBOOK[stem]; return d && d.format==='bangakbon-ocr' && Array.isArray(d.pages) ? d : null;
+  } catch(e){ return null; }
+}
 async function openCommons(title,name,want){
   if (state.running) return; const btn=$('randomPage'); btn.disabled=true;
   try {
     setMsg(`위키미디어 공용에서 ${name} 한 면을 가져오는 중…`);
+    const pre=await preBook(title);
+    if (pre && !want){   // 미리 읽어 본 결과로 본문이 제대로 있는 면만 고른다
+      const ok=[...new Set(pre.pages.filter(q=>q.status==='ok' && (q.lines||[]).length>=8).map(q=>q.no))];
+      if (ok.length) want=ok[Math.floor(Math.random()*ok.length)];
+    }
     const {blob,page,descr}=await commonsPage(title,want);
     const f=new File([blob],`${name} ${page}쪽.jpg`,{type:'image/jpeg'}); f.srcPage=page; f.srcName=name;
     state.commons=title; pick(f);
+    const pq=pre ? pre.pages.filter(q=>q.no===page) : [];
+    if (pq.length) state.imp={format:'bangakbon-ocr', version:1, src:title, model:pre.model, pages:pq.map(q=>({...q, no:1}))};
     $('fname').innerHTML=''; const a=document.createElement('a'); a.href=descr; a.target='_blank'; a.rel='noopener'; a.textContent=`위키미디어 공용 · ${name} ${page}쪽 (국립중앙도서관 소장본)`; $('fname').appendChild(a);
     await run();
     if (state.pages.length && state.pages[0].status==='ok') setMsg(`${name} ${page}쪽을 읽었습니다. 틀린 글자를 고친 뒤 아래 '학습용으로 보내기'를 눌러 주세요.`);
@@ -1377,7 +1396,7 @@ if (CFG.github && CFG.inbox) $('teach').hidden=false;
 // 주소로 특정 면 열기: ?f=File:...pdf&p=쪽&n=이름
 (()=>{ if (!CFG.github) return; const q=new URLSearchParams(location.search), f=q.get('f'), pg=+q.get('p');
   if (f && /^File:[^\/]+\.pdf$/i.test(f) && pg>0) setTimeout(()=>openCommons(f, (q.get('n')||f.replace(/^File:|\.pdf$/gi,'')).slice(0,40), pg), 300); })();
-$('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
+$('trySample').onclick=async()=>{ if (state.running) return; try { const b=await (await fetch('sample.jpg')).blob(); state.imp=null; pick(new File([b],'금향졍긔 권하 21쪽.jpg',{type:'image/jpeg'})); run(); } catch(e){ setMsg('예시 면을 불러오지 못했습니다.', true); } }; $('stop').onclick=()=>{ state.stop=true; setMsg('지금 읽는 행까지 마치고 멈춥니다…'); };
 
 // ---------- 예시 면 ----------
 state.name = SAMPLE.name; state.useLM = !!CFG.lm;

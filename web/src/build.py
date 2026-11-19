@@ -24,3 +24,15 @@ print('web/index.html', len(gh))
 assert INBOX, 'inbox_url.txt가 없습니다'
 open(f'{H}/../contributors.html', 'w', encoding='utf-8').write(open(f'{H}/contributors.src.html', encoding='utf-8').read().replace('__INBOX__', INBOX))
 print('web/contributors.html')
+# 미리 판독한 책 목록 (Colab 대량 판독 결과 .json을 web/pre에 넣으면 '고칠 면 하나 받기'가 엔진 없이 바로 띄운다)
+import glob, re
+P = f'{H}/../pre'
+if os.path.isdir(P):
+    books, model = {}, ''
+    for f in sorted(glob.glob(P + '/*.json')):
+        if f.endswith('/index.json'): continue
+        d = json.load(open(f, encoding='utf-8'))
+        books[os.path.basename(f)[:-5]] = {'pages': len({q['no'] for q in d['pages']}), 'ok': sum(q['status'] == 'ok' for q in d['pages'])}
+        m = re.search(r'v(\d+)', d.get('model', '')); model = (m.group(1) + '차') if m else d.get('model', '')
+    json.dump({'model': model, 'books': books}, open(P + '/index.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
+    print('web/pre/index.json', len(books), '권')

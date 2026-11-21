@@ -17,7 +17,7 @@ for z in glob.glob(W + '/**/*.zip', recursive=True):
         n = f.namelist(); print('  파일', len(n), n[:3])
         js = [x for x in n if x.endswith('.json')]
         if js and len(n) < 200000:
-            d = json.loads(f.read(js[0]).decode('utf-8')); s = json.dumps(d, ensure_ascii=False)
+            d = json.loads(f.read(js[0]).decode('utf-8-sig')); s = json.dumps(d, ensure_ascii=False)
             print('  예시 라벨:', s[:1500])
         books = collections.Counter(x.split('/')[-2] if '/' in x else '' for x in n)
         print('  책(폴더)별 파일 수 앞부분:', books.most_common(8), '... 총', len(books))

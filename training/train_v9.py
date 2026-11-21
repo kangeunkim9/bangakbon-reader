@@ -19,7 +19,11 @@ get = lambda f: requests.get(RAW + f, timeout=60).text
 
 # ---------------- 0) 7차의 공통 코드(모델·행 나누기)와 월봉긔 검수 정답 ----------------
 src7 = get('train_v7.py')
-exec(src7[:src7.index('# ---------------- 2)')], globals())   # 공통 코드 + 월봉긔 행 자료까지
+exec(src7[:src7.index('# ---------------- 1)')], globals())   # 공통 코드(모델·행 나누기)
+if os.path.exists(ROOT + '/private/wolbong_gt.json'):              # 월봉긔 사람 검수 정답이 드라이브에 있으면 행 자료를 새로 만든다
+    exec(src7[src7.index('# ---------------- 1)'):src7.index('# ---------------- 2)')], globals())
+elif not os.path.isdir('/content/data/lines'):
+    print('월봉긔 검수 정답이 없어 이번에는 빼고 학습한다', flush=True); os.makedirs('/content/data/lines', exist_ok=True)
 exec(get('aug_invert.py'), globals())                                                       # invert_span
 
 # ---------------- 1) 경판 행 자료(7차 때 만든 것)와 검증 면 나누기(7차와 똑같이) ----------------
@@ -30,6 +34,7 @@ for p, t in load_pairs(OUTL): P5.setdefault(os.path.basename(p).split('_')[0], [
 face5 = lambda p: '_'.join(os.path.basename(p).split('_')[:2])
 facew = lambda p: os.path.basename(p).rsplit('_', 1)[0]
 VF5 = {'wb': {'01b', '06b', '11b', '32b'}}
+if not P5['wb']: del P5['wb']
 for k in P5:
     if k != 'wb': fs = sorted({face5(p) for p, _ in P5[k]}); random.seed(len(k) * 7 + len(fs)); VF5[k] = set(random.sample(fs, min(4, max(1, len(fs) // 6))))
 fw = lambda k, p: facew(p) if k == 'wb' else face5(p)
@@ -59,7 +64,8 @@ print('고쳐 보낸 면', nf, '면 →', len(INTR), '행', flush=True)
 
 # ---------------- 3) AI허브 목판본: 춘향전은 학습으로, 심청전_04만 시험 ----------------
 os.makedirs('/content/aihub_lines', exist_ok=True)
-with zipfile.ZipFile(ROOT + '/aihub/aihub_mokpan_lines.zip') as z: z.extractall('/content/aihub_lines')
+AHZ = ROOT + '/aihub/aihub_mokpan_lines_v9.zip' if os.path.exists(ROOT + '/aihub/aihub_mokpan_lines_v9.zip') else ROOT + '/aihub/aihub_mokpan_lines.zip'
+with zipfile.ZipFile(AHZ) as z: z.extractall('/content/aihub_lines')
 AH = [json.loads(l) for l in open('/content/aihub_lines/lines.jsonl', encoding='utf-8')]
 AH = [(f"/content/aihub_lines/{r['img']}", r['text'], r['book']) for r in AH if len(G(r['text'])) >= 3 and os.path.exists(f"/content/aihub_lines/{r['img']}")]
 hold9 = lambda b: '심청전_04' in b

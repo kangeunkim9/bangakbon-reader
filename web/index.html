@@ -177,6 +177,9 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
   .bench{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+.spacebox{max-width:1200px;margin:18px auto;padding:0 16px}
+.spacebox textarea{width:100%;min-height:320px;font-size:16px;line-height:1.9;font-family:inherit;padding:12px;border:1px solid var(--line,#ccc);border-radius:8px;box-sizing:border-box}
+.spacebox .row{margin-top:8px}
 </style>
 
 <div class="wrap">
@@ -263,11 +266,19 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <button class="primary" id="saveAll" hidden>텍스트 파일로 저장</button>
     <button id="saveJson" hidden title="다른 컴퓨터에서 이어서 하거나 보관할 때. PDF와 함께 다시 넣으면 그대로 불러옵니다">결과 파일(.json) 저장</button>
     <button id="copyAll">전체 복사</button>
+    <button id="spaceBtn" title="판독문을 다 확인하고 고친 뒤에 누르세요. 행을 이어 붙여 띄어 쓴 전사문을 따로 만듭니다">띄어쓰기</button>
     <small id="editInfo"></small>
     <small id="trainCount"></small>
     <span class="sp"></span>
   </section>
   <textarea class="copybox" id="copybox" hidden readonly aria-label="복사할 텍스트"></textarea>
+
+  <section class="spacebox" id="spaceBox" hidden>
+    <h3>띄어쓴 전사문</h3>
+    <p class="help">확인한 판독문을 면마다 이어 붙여 자동으로 띄어 썼어요. 장서각 국문장편소설 전사의 띄어쓰기를 배운 모델이라 틀린 곳이 있을 수 있으니, 여기서 바로 고쳐 쓰세요. 위의 행 단위 판독문은 그대로 남아요.</p>
+    <textarea id="spaceText" spellcheck="false" aria-label="띄어쓴 전사문"></textarea>
+    <div class="row"><button class="primary" id="spaceSave">텍스트 파일로 저장</button> <button id="spaceCopy">복사</button></div>
+  </section>
 
   <section class="about">
     <div class="goal">
@@ -295,7 +306,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 창을 닫으면 사라지니 저장하거나 복사해 두세요.</p>
       <p>검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
     </div>
-        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 판독 모델의 학습용 정답과 언어 모델 보정에는 국립국어원 「국어 역사 자료 말뭉치 2024」(KOHICO)를 활용했습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
+        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 판독 모델의 학습용 정답과 언어 모델 보정에는 국립국어원 「국어 역사 자료 말뭉치 2024」(KOHICO)를, 띄어쓰기 모델 학습에는 한국학중앙연구원 장서각의 국문장편소설 전사문을 활용했습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
   </section>
 </div>
 
@@ -620,7 +631,7 @@ window.KP = KP;
 <script>
 const CFG = {
   model: ['model_v8_0.wasm','model_v8_1.wasm','model_v8_2.wasm','model_v8_3.wasm'], modelLabel: '8차 모델',
-  lm: 'lm7.gz.wasm', charset: 'charset_v8.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  lm: 'lm7.gz.wasm', spacer: 'spacer.wasm', spacerVocab: 'spacer_vocab.json', charset: 'charset_v8.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
   approxMB: 47, github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
@@ -1136,6 +1147,41 @@ async function copyText(t, okMsg){
   try { await navigator.clipboard.writeText(t); setMsg(okMsg); }
   catch(e){ const box=$('copybox'); box.hidden=false; box.value=t; box.focus(); box.select(); setMsg('자동 복사가 막혀 있어 아래 칸에 전체를 선택해 두었습니다. Ctrl+C(⌘+C)로 복사하세요.'); }
 }
+// ---------- 띄어쓰기 (판독문을 확인한 뒤 따로 만든다) ----------
+const GCL=/[\u1100-\u115F\uA960-\uA97F]+[\u1160-\u11A7\uD7B0-\uD7C6]*[\u11A8-\u11FF\uD7CB-\uD7FB]*|[\s\S]/gu;
+let SPACER=null;
+async function loadSpacer(){
+  if (SPACER) return SPACER;
+  ort.env.wasm.wasmPaths='./'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+  const [m,v]=await Promise.all([fetchBytes(CFG.spacer,()=>{}), fetch(CFG.spacerVocab).then(r=>r.json())]);
+  const sess=await ort.InferenceSession.create(m,{executionProviders:['wasm']});
+  SPACER={sess, idx:new Map(v.map((g,i)=>[g,i]))}; return SPACER;
+}
+async function spaceText(s){
+  const {sess,idx}=await loadSpacer();
+  const toks=s.normalize('NFC').replace(/\s+/g,'').match(GCL)||[];
+  if (!toks.length) return '';
+  const ids=BigInt64Array.from(toks, g=>BigInt(idx.has(g)?idx.get(g):1));
+  const y=(await sess.run({x:new ort.Tensor('int64',ids,[1,ids.length])})).y.data;
+  let r=''; toks.forEach((g,i)=>{ r+=g; if (y[i]>0 && i<toks.length-1) r+=' '; }); return r;
+}
+async function spacedAll(){
+  const parts=[];
+  for (const P of state.pages){ if (P.status==='empty') continue; parts.push(`## ${plab(P)}\n`+await spaceText(live(P).map(l=>l.text).join(''))); }
+  return `# ${state.name} 띄어쓴 전사문 (자동 띄어쓰기, 사람이 확인할 것)\n\n`+parts.join('\n\n')+'\n';
+}
+$('spaceBtn').onclick=async()=>{
+  if (!state.pages.length){ setMsg('먼저 판독하고, 판독문을 확인한 뒤에 눌러 주세요.'); return; }
+  setMsg('띄어 쓰는 중…');
+  try { $('spaceText').value=await spacedAll(); $('spaceBox').hidden=false; $('spaceBox').scrollIntoView({behavior:'smooth'}); setMsg('띄어쓴 전사문을 만들었어요. 아래에서 확인하고 고칠 수 있어요.'); }
+  catch(e){ setMsg('띄어쓰기 모델을 불러오지 못했어요: '+e.message, true); }
+};
+$('spaceCopy').onclick=()=>copyText($('spaceText').value,'띄어쓴 전사문을 복사했어요.');
+$('spaceSave').onclick=async()=>{
+  const fn=`${state.name||'판독'}_띄어쓴전사문.txt`, data=$('spaceText').value;
+  if (downloads){ try { await downloads.save({filename:fn, data}); setMsg('저장했어요.'); } catch(e){ setMsg('저장하지 못했어요. 복사를 쓰세요.', true); } return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'text/plain;charset=utf-8'})); a.download=fn; document.body.appendChild(a); a.click(); a.remove(); setMsg('저장했어요.');
+};
 // ---------- 학습용으로 보내기 ----------
 let DB=null, ASSETS=null, UID=null, SENT=new Map();
 function fnv(str){ let h=0x811c9dc5; for (const ch of str){ h^=ch.codePointAt(0); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,'0'); }

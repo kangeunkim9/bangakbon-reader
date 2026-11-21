@@ -282,11 +282,11 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <div>
       <h3>어떻게 읽나</h3>
       <p>면에서 테두리선을 지우고 세로 행을 자동으로 나눈 뒤, 행마다 판독 모델이 글자를 읽습니다. 판독문은 <b>한 줄이 판본 한 행</b>이고 오른쪽 행부터 차례로 놓입니다.</p>
-      <p class="lmonly">언어 모델 보정은 KOHICO에 전사된 경판 45종으로 만든 자모 7-gram으로 애매한 글자를 고릅니다. 이 45종에 든 작품(금향정기 포함)은 실제보다 잘 읽힐 수 있습니다.</p>
+      <p class="lmonly">언어 모델 보정은 국어 역사 자료 말뭉치 2024에 전사된 경판 45종으로 만든 자모 7-gram(자모가 이어지는 빈도표)으로 애매한 글자를 고릅니다. 이 45종에 든 작품(금향정기 포함)은 실제보다 잘 읽힐 수 있습니다.</p>
     </div>
     <div>
       <h3>정확도</h3>
-      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분에서 글자 오류율 <b class="num">5.9%</b>입니다<span class="lmonly">(언어 모델 보정을 켜면 조금 더 낮아집니다)</span>. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
+      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분에서 글자 오류율 <b class="num">5.9%</b>입니다<span class="lmonly">(언어 모델 보정을 켜면 더 낮아집니다. 같은 조건의 시험에서 약 3.2%)</span>. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
       <p>지금 판독 모델(8차)은 경판 17종에 AI허브 옛한글 목판본 자료 약 14만 행을 더해 학습했습니다. 학습에 쓰지 않은 AI허브 완판 소설(춘향전·심청전)에서는 오류율이 <b class="num">2.8%</b>입니다(7차 3.6%, 5차 10.4%). 필사본은 아직 오류가 많습니다. 판독문은 검토용 초벌로 쓰세요.</p>
     </div>
     <div>
@@ -295,7 +295,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 창을 닫으면 사라지니 저장하거나 복사해 두세요.</p>
       <p>검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
     </div>
-        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 학습용 전사는 국립국어원이 제공하는 KOHICO(국어 역사 말뭉치)를 썼습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
+        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 판독 모델의 학습용 정답과 언어 모델 보정에는 국립국어원 「국어 역사 자료 말뭉치 2024」(KOHICO)를 활용했습니다(국립국어원 결과물 공개 승인). 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
   </section>
 </div>
 
@@ -614,12 +614,12 @@ window.KP = KP;
 <script>
 const CFG = {
   model: ['model_v8_0.wasm','model_v8_1.wasm','model_v8_2.wasm','model_v8_3.wasm'], modelLabel: '8차 모델',
-  lm: null, charset: 'charset_v8.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
-  approxMB: 45, github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
+  lm: 'lm7.gz.wasm', charset: 'charset_v8.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  approxMB: 47, github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
-const SAMPLE = {"name": "금향졍긔 권하", "title": "금향졍긔 권하 PDF 21쪽", "no": 21, "W": 1500, "H": 1910, "t": 128, "bt": 1842, "cols": [[1401, 1498], [1304, 1401], [1204, 1304], [1108, 1204], [1019, 1108], [916, 1019], [820, 916], [724, 820], [626, 724], [532, 626], [436, 532], [337, 436], [239, 337], [124, 239], [51, 124]], "lines": ["ᄒᆞ믈듯고삼인이바야흐로길를올나낙양의이르러는슌쇼군", "을맛나진즁의이르러공문ᄉᆞ연을젼ᄒᆞᆫᄃᆡ복고회은이드러가곽", "공긔품ᄒᆞ되밧긔피란ᄒᆞ는녀ᄌᆞ삼인이슈양셩부장뇌만츈의공", "문을가지고지ᄂᆞ가기로쇼장이쳔단치못ᄒᆞ여알외ᄂᆞ이다ᄒᆞ거ᄂᆞᆯ공", "이공문을드리라ᄒᆞ여보고왈원ᄂᆡ갈ᄐᆡ고의녀ᄋᆡ여니와거년츄", "구월익셩졉ᄒᆞᆫ거시여ᄂᆞᆯ엇지이럿틋지완히왓ᄂᆞ뇨회온왈쇼", "장이ᄌᆞ셔히무른즉일노의도젹을두려길를ᄒᆡᆼ치못ᄒᆞ고무ᄐᆡ", "관밧긔셔ᄉᆞ오삭을두류ᄒᆞ다가동경회복ᄉᆫ믈듯고이졔야이곳", "외이르럿노라혼더이다곽공왈이믜뭇기를명ᄇᆡᆨ히ᄒᆞ여실진ᄃᆡ", "이는츙신의ᄯᆞᆯ이니뇌장군의공문이업셔도일졍그르지아니리라", "길를가르쳐장안으로보ᄂᆡ미조흐되다만젹병이셔경의웅거ᄒᆞ여", "스니무ᄉᆞ히득달치못헐거시ᄆᆡ아직이근쳐의잇다가시셰를보아도", "라가라일으라ᄒᆞ거ᄂᆞᆯ회은이녕을듯고나와위구를불너곽공의이", "르던말를이른후공문을도로쥬거ᄂᆞᆯ삼인이ᄉᆞ례ᄒᆞ고진밧긔나", "와두루ᄉᆞᆲ펴인가를찻고져ᄒᆞ여방황ᄒᆞ더니ᄒᆞᆫ곳의연긔나믈"]};
+const SAMPLE = {"name": "금향졍긔 권하", "title": "금향졍긔 권하 PDF 21쪽", "no": 21, "W": 1500, "H": 1910, "t": 128, "bt": 1842, "cols": [[1401, 1498], [1304, 1401], [1204, 1304], [1108, 1204], [1019, 1108], [916, 1019], [820, 916], [724, 820], [626, 724], [532, 626], [436, 532], [337, 436], [239, 337], [124, 239], [51, 124]], "lines": ["ᄒᆞ믈듯고삼인이바야흐로길를올나낙양의이르러는슌쇼군", "을맛나진즁의이르러공문ᄉᆞ연을젼ᄒᆞᆫᄃᆡ복고회은이드러가곽", "공긔품ᄒᆞ되밧긔피란ᄒᆞ는녀ᄌᆞ삼인이슈양셩부장뇌만츈의공", "문을가지고지ᄂᆞ가기로쇼장이쳔단치못ᄒᆞ여알외ᄂᆞ이다ᄒᆞ거ᄂᆞᆯ공", "이공문을드리라ᄒᆞ여보고왈원ᄂᆡ갈ᄐᆡ고의녀ᄋᆡ여니와거년츄", "구월의셩졉ᄒᆞᆫ거시여ᄂᆞᆯ엇지이럿틋지완히왓ᄂᆞ뇨회은왈쇼", "장이ᄌᆞ셔히무른즉일노의도젹을두려길를ᄒᆡᆼ치못ᄒᆞ고무ᄐᆡ", "관밧긔셔ᄉᆞ오삭을두류ᄒᆞ다가동경회복ᄒᆞ믈듯고이졔야이곳", "의이르럿노라혼더이다곽공왈이믜뭇기를명ᄇᆡᆨ히ᄒᆞ여실진ᄃᆡ", "이는츙신의ᄯᆞᆯ이니뇌장군의공문이업셔도일졍그르지아니리라", "길를가르쳐장안으로보ᄂᆡ미조흐되다만젹병이셔경의웅거ᄒᆞ여", "스니무ᄉᆞ히득달치못헐거시ᄆᆡ아직이근쳐의잇다가시셰를보아도", "라가라일으라ᄒᆞ거ᄂᆞᆯ회은이녕을듯고나와위구를불너곽공의이", "르던말를이른후공문을도로쥬거ᄂᆞᆯ삼인이ᄉᆞ례ᄒᆞ고진밧긔나", "와두루ᄉᆞᆲ펴인가를찻고져ᄒᆞ여방황ᄒᆞ더니ᄒᆞᆫ곳의연긔나믈"]};
 const $ = (id)=>document.getElementById(id);
 const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, lmReady:null };
 

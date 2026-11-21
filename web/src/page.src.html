@@ -466,6 +466,7 @@ async function run(){
         const sc=g.w/(iq.W||g.w);
         const P = {no: state.file.srcPage||no, side, ...meta, W:g.w, H:g.h, t:Math.round(iq.t*sc), bt:Math.round(iq.bt*sc), cols:(iq.cols||[]).map(([x0,x1])=>[Math.round(x0*sc),Math.round(x1*sc)]),
           lines:(iq.lines||[]).map(t=>typeof t==='string' ? {text:t, orig:t} : {...t}), conf:iq.conf||[], status:iq.status||'ok', note:iq.note||'', reveal:!!iq.reveal, flipped:!!iq.flipped, url: await previewURL(g), full: await fullJPEG(g)};
+          if (!(iq.lines||[]).some(t=>typeof t==='object' && t.removed)) markEdgeJunk(P);
         state.pages.push(P); if (state.pages.length===1) state.cur=0;
         done++; setMsg(`${lab} 불러옴 (${state.imp.resumed?'저장해 둔 결과':'미리 판독한 결과'})`); setBar(done/(state.total||1)); renderPages(); if (state.cur===state.pages.length-1) renderCurrent(); await idle(); continue;
       }
@@ -519,6 +520,7 @@ async function run(){
         const junk=k=>P.lines[k] && ((P.conf[k]||0)<0.6 || KP.graphemes(P.lines[k].text)<3);
         if (seg.edge && seg.edge.last && P.lines.length===P.cols.length && junk(P.lines.length-1)){ P.lines.pop(); P.cols.pop(); P.conf.pop(); }
         if (seg.edge && seg.edge.first && P.lines.length===P.cols.length && junk(0)){ P.lines.shift(); P.cols.shift(); P.conf.shift(); }
+        markEdgeJunk(P);
         const avgConf = P.conf && P.conf.length ? P.conf.reduce((u,v)=>u+v,0)/P.conf.length : 1;
         if (P.lines.length && (median(P.lines.map(l=>KP.graphemes(l.text)))<8 || avgConf<0.55)) P.status='nomatch';
       }
@@ -615,9 +617,9 @@ function lineItem(P,k){
     del.onclick=()=>{ P.lines.splice(k,1); renderCurrent(); renderEditInfo(); }; }
   else {   // 글자 없는 자리를 행으로 잘못 센 경우: 지우지 않고 '뺌'으로 표시해 둔다 (행 틀 번호가 어긋나지 않게)
     if (L.removed) li.classList.add('removed');
-    del.textContent = L.removed ? '되살리기' : '✕'; del.title = L.removed ? '뺀 행 되살리기' : '글자가 없는 행이면 빼기';
+    del.textContent = L.removed ? '되살리기' : '✕'; del.title = L.removed ? (L.auto?'판심·테두리로 보여 자동으로 뺀 행입니다. 본문이면 되살리세요':'뺀 행 되살리기') : '글자가 없는 행이면 빼기';
     del.setAttribute('aria-label',(k+1)+(L.removed?'행 되살리기':'행 빼기'));
-    del.onclick=()=>{ L.removed=!L.removed; renderCurrent(); renderEditInfo(); }; }
+    del.onclick=()=>{ L.removed=!L.removed; delete L.auto; renderCurrent(); renderEditInfo(); }; }
   li.appendChild(del);
   return li;
 }
@@ -821,8 +823,15 @@ function renderEditInfo(){
 const esc = (s)=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 // ---------- 내보내기 ----------
-function lchg(l){ return !!l.removed || l.text!==l.orig; }
+function lchg(l){ return (!!l.removed && !l.auto) || l.text!==l.orig; }
 function live(P){ return P.lines.filter(l=>!l.removed); }
+// 면의 첫머리·끝에 붙은 판심(책 이름·어미·장수)이나 광곽(테두리) 줄은 '뺌'으로 표시한다. 되살리기로 되돌릴 수 있다
+function edgeJunk(L,c){ const n=KP.graphemes(L.text); return c<0.6 || n<=2 || (n<=3 && c<0.9); }
+function markEdgeJunk(P){
+  const L=P.lines, C=P.conf||[]; if (L.length<6) return;
+  for (let k=0; k<2 && k<L.length; k++){ if (L[k].removed || !edgeJunk(L[k],C[k]||0)) break; L[k].removed=true; L[k].auto=true; }
+  for (let k=L.length-1; k>=L.length-2 && k>=0; k--){ if (L[k].removed && !L[k].auto) break; if (L[k].removed) continue; if (!edgeJunk(L[k],C[k]||0)) break; L[k].removed=true; L[k].auto=true; }
+}
 function pageText(P){ return `## ${plab(P)}\n` + (P.status==='empty' ? '(본문 없음)\n' : P.status==='nomatch' ? '(본문을 찾지 못함: 표지·빈 면·훼손 면일 수 있음)\n' + live(P).map(l=>l.text).join('\n')+'\n' : live(P).map(l=>l.text).join('\n')+'\n'); }
 function allText(){
   const d=new Date(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;

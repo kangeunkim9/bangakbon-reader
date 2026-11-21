@@ -148,10 +148,19 @@ def _read_face(R, im, no, side, split, srcW, srcH):
     if len(cols) < 6: q.update(cols=[], lines=[], conf=[], status='empty'); return q
     arrs = [prep_arr(im.crop((max(0, a - 3), t, c + 3, bt))) for a, c in cols]
     out = R.read(arrs); q['lines'] = [s for s, _ in out]; q['conf'] = [round(c, 3) for _, c in out]
-    for k in (-1, 0):   # 판 가장자리에 붙은 짧고 흐린 행(테두리·얼룩)은 뺀다
-        if len(q['lines']) > 6 and len(G(q['lines'][k])) < 3 and q['conf'][k] < 0.6:
-            q['lines'].pop(k); q['conf'].pop(k); q['cols'].pop(k)
-    lens = [len(G(s)) for s in q['lines']]
+    # 면 첫머리·끝의 판심(책 이름·어미·장수)이나 광곽(테두리) 줄: 판독기와 같은 규칙으로 '뺌' 표시(되살릴 수 있게 지우지는 않음)
+    junk = lambda s, c: c < 0.6 or len(G(s)) <= 2 or (len(G(s)) <= 3 and c < 0.9)
+    n = len(q['lines']); rm = set()
+    if n >= 6:
+        for k in range(min(2, n)):
+            if not junk(q['lines'][k], q['conf'][k]): break
+            rm.add(k)
+        for k in range(n - 1, max(n - 3, -1), -1):
+            if k in rm or not junk(q['lines'][k], q['conf'][k]): break
+            rm.add(k)
+    q['lines'] = [{'text': s, 'orig': s, 'removed': True, 'auto': True} if i in rm else s for i, s in enumerate(q['lines'])]
+    txt = lambda x: x if isinstance(x, str) else ('' if x.get('removed') else x['text'])
+    lens = [len(G(txt(s))) for s in q['lines']]
     cover = all(n < 3 for n in lens[:6]); avg = sum(q['conf']) / len(q['conf'])
     q['status'] = 'nomatch' if (cover or float(np.median(lens)) < 8 or avg < 0.55) else 'ok'
     return q
@@ -172,7 +181,7 @@ def to_text(d):
         lab = f"{q['no']}쪽" + (' ' + q['side'] if q['side'] else '')
         if q['status'] == 'empty': out.append(f'## {lab}\n(본문 없음)\n')
         elif q['status'] == 'nomatch': out.append(f'## {lab}\n(표지·빈 면으로 보임)\n')
-        else: out.append(f'## {lab}\n' + '\n'.join(q['lines']) + '\n')
+        else: out.append(f'## {lab}\n' + '\n'.join(s if isinstance(s, str) else s['text'] for s in q['lines'] if isinstance(s, str) or not s.get('removed')) + '\n')
     return '\n'.join(out)
 
 def get_commons(title, dst):

@@ -39,7 +39,7 @@ def split_spread(im):
     k = max(5, round(W / 60) | 1); sm = np.convolve(col, np.ones(k) / k, 'same')
     lo, hi = int(W * 0.38), int(np.ceil(W * 0.62)); x = lo + int(np.argmin(sm[lo:hi]))
     med = float(np.median(sm[int(W * 0.1):int(np.ceil(W * 0.9))]))
-    if sm[x] > med * 0.25: return [(im, '', None)]
+    if sm[x] > med * 0.6: return [(im, '', None)]
     return [(im.crop((x, 0, W, Hh)), '오른쪽', [x, W]), (im.crop((0, 0, x, Hh)), '왼쪽', [0, x])]
 
 def norm_width(im):

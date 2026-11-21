@@ -294,7 +294,7 @@ KP.splitSpread = function(g){
   const k=Math.max(5, Math.round(W/60)|1), sm=convSame(Array.from(col), k);
   let best=-1, bv=Infinity; for (let x=Math.floor(W*0.38); x<Math.ceil(W*0.62); x++) if (sm[x]<bv){ bv=sm[x]; best=x; }
   const mid=Array.from(sm.slice(Math.floor(W*0.1), Math.ceil(W*0.9))).sort((u,v)=>u-v), med=mid[mid.length>>1];
-  if (!(best>0) || bv > med*0.25) return [g];   // 뚜렷한 골이 없으면 한 면으로 둔다
+  if (!(best>0) || bv > med*0.6) return [g];   // 가로로 넓은 사진은 거의 두 면이므로, 가운데가 꽤 옅기만 하면 나눈다
   const crop=(x0,x1)=>{ const w=x1-x0, d=new Uint8Array(w*H); for (let y=0;y<H;y++) d.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d}; };
   return [crop(best, W), crop(0, best)];
 };

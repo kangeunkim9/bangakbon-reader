@@ -601,6 +601,12 @@ KP.splitSpread = function(g){
   const crop=(x0,x1)=>{ const w=x1-x0, d=new Uint8Array(w*H); for (let y=0;y<H;y++) d.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d}; };
   return [crop(best, W), crop(0, best)];
 };
+// 좌우가 뒤집혀 스캔된 면을 되돌린다
+KP.flipH = function(g){
+  const W=g.w, H=g.h, o=new Uint8Array(W*H);
+  for (let y=0;y<H;y++){ const r=y*W; for (let x=0;x<W;x++) o[r+x]=g.d[r+W-1-x]; }
+  return {w:W, h:H, d:o};
+};
 // 면 사진 너비를 학습 때(위키미디어 공용 스캔, 약 1500px)와 비슷하게 맞춘다
 KP.normWidth = function(im){
   if (im.w>1700 || im.w<1000){ const ow=1500, oh=Math.max(1,Math.round(im.h*ow/im.w)); return resizeBilinear(im, ow, oh); }
@@ -759,9 +765,10 @@ async function run(){
       const ow = g.w; g = KP.normWidth(g); const lab = no+'쪽'+(side?' '+side:'');
       if (state.stop) break;
       if (iq){   // Colab에서 미리 판독한 결과가 있으면 다시 읽지 않는다
+        if (iq.flipped) g = KP.flipH(g);
         const sc=g.w/(iq.W||g.w);
         const P = {no: state.file.srcPage||no, side, ...meta, W:g.w, H:g.h, t:Math.round(iq.t*sc), bt:Math.round(iq.bt*sc), cols:(iq.cols||[]).map(([x0,x1])=>[Math.round(x0*sc),Math.round(x1*sc)]),
-          lines:(iq.lines||[]).map(t=>typeof t==='string' ? {text:t, orig:t} : {...t}), conf:iq.conf||[], status:iq.status||'ok', note:iq.note||'', reveal:!!iq.reveal, url: await previewURL(g), full: await fullJPEG(g)};
+          lines:(iq.lines||[]).map(t=>typeof t==='string' ? {text:t, orig:t} : {...t}), conf:iq.conf||[], status:iq.status||'ok', note:iq.note||'', reveal:!!iq.reveal, flipped:!!iq.flipped, url: await previewURL(g), full: await fullJPEG(g)};
         state.pages.push(P); if (state.pages.length===1) state.cur=0;
         done++; setMsg(`${lab} 불러옴 (${state.imp.resumed?'저장해 둔 결과':'미리 판독한 결과'})`); setBar(done/(state.total||1)); renderPages(); if (state.cur===state.pages.length-1) renderCurrent(); await idle(); continue;
       }
@@ -774,7 +781,7 @@ async function run(){
       else {
         if (idx===0 || state.cur===idx-1){ state.cur=idx; }
         // 행 그림을 만들어 여러 판독기(워커)에 나눠 맡긴다. 처음 6행을 먼저 읽어 표지·빈 면이면 그만 읽는다
-        const n=seg.cols.length, res=new Array(n); let got=0;
+        let n=seg.cols.length, res=new Array(n); let got=0;
         const one=async(k)=>{
           const [x0,x1]=seg.cols[k]; const p=KP.prepLine(g,x0,x1,seg.t,seg.bt);
           const tl=performance.now(); const {y,T,C}=await eng.run(p.data,p.w); lineMs.push((performance.now()-tl)/eng.par);
@@ -791,6 +798,24 @@ async function run(){
         const runAll=async(ks)=>{ let q=0; await Promise.all(Array.from({length:Math.min(eng.par,ks.length)},async()=>{ while (q<ks.length && !state.stop){ await one(ks[q++]); } })); };
         const head=[...Array(Math.min(6,n)).keys()];
         await runAll(head);
+        const meanConf=a=>a.length?a.reduce((u,v)=>u+v,0)/a.length:0;
+        const c0=meanConf(P.conf||[]);
+        if (c0<0.8 && !state.stop){   // 좌우가 뒤집혀 스캔된 면일 수 있다
+          const gm=KP.flipH(g); let sm; try { sm=KP.segment(gm); } catch(e){ sm={cols:[]}; }
+          if (sm.cols.length>=6){
+            const cs=[];
+            for (const k of [...Array(Math.min(6,sm.cols.length)).keys()]){
+              const [x0,x1]=sm.cols[k]; const p=KP.prepLine(gm,x0,x1,sm.t,sm.bt); const {y,T,C}=await eng.run(p.data,p.w); const lp=KP.logSoftmax(y,T,C);
+              let s2=0, n2=0; for (let t=0;t<T;t++){ let m=-Infinity, kk=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; kk=c; } if (kk){ s2+=Math.exp(m); n2++; } }
+              cs.push(n2?s2/n2:0);
+            }
+            const c1=meanConf(cs);
+            if (c1>=0.85 && c1>c0+0.15){
+              g=gm; seg=sm; Object.assign(P, {t:sm.t, bt:sm.bt, cols:sm.cols, lines:[], conf:[], flipped:true, url: await previewURL(gm), full: await fullJPEG(gm)});
+              n=sm.cols.length; res=new Array(n); got=0; await runAll(head);
+            }
+          }
+        }
         const cover = P.lines.length>=head.length && P.lines.slice(0,head.length).every(l=>KP.graphemes(l.text)<3);
         if (!cover && !state.stop) await runAll([...Array(n).keys()].slice(head.length));
         // 가장자리에 새로 붙인 행이 글자가 아니면(테두리·얼룩) 뺀다
@@ -866,6 +891,7 @@ function renderCurrent(partial){
     body.innerHTML='<div class="notice">표지나 빈 면처럼 보여서 판독문을 숨겼습니다. 본문이 있는 면이라면 행 나누기가 어긋났을 수 있습니다. <button type="button" id="revealLines">그래도 행 보기</button></div>';
     $('revealLines').onclick=()=>{ P.reveal=true; renderCurrent(); renderTrain(); }; return; }
   body.innerHTML = (P.status==='nomatch' ? '<div class="notice">표지나 빈 면처럼 보이는 면입니다. 본문이 맞다면 고쳐서 보내 주세요.</div>' : '');
+  if (P.flipped) body.insertAdjacentHTML('afterbegin', '<div class="notice">좌우가 뒤집혀 스캔된 면이라 바로 돌려서 읽었어요. 왼쪽 사진도 돌린 모습이에요.</div>');
   if (P.small) body.insertAdjacentHTML('afterbegin', '<div class="notice">사진이 작아서(면 너비 700픽셀 미만) 행을 잘못 나누거나 글자를 많이 틀릴 수 있어요. 더 큰 원본 사진이나 PDF를 넣으면 훨씬 잘 읽어요.</div>');
   const wrap=document.createElement('div'); if (state.vert) wrap.className='vert';
   const ol=document.createElement('ol'); ol.className='lines'; ol.setAttribute('aria-label','판독문, 오른쪽 행부터');
@@ -1199,7 +1225,7 @@ $('copyAll').onclick=()=>copyText(allText(), '전체 판독문을 복사했습�
 // ---------- 읽은 결과 보관: 브라우저에 자동 저장, 같은 파일을 다시 넣으면 이어서 ----------
 function snapshot(){
   const pages=state.pages.filter(P=>!P.sample).map(P=>({no:P.no, side:P.side||'', split:P.split||null, srcW:P.srcW||P.W, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols,
-    lines:P.lines.map(l=>{ const o={text:l.text, orig:l.orig}; if (l.removed) o.removed=true; if (l.added) o.added=true; return o; }), conf:P.conf||[], status:P.status, note:P.note||'', reveal:!!P.reveal}));
+    lines:P.lines.map(l=>{ const o={text:l.text, orig:l.orig}; if (l.removed) o.removed=true; if (l.added) o.added=true; return o; }), conf:P.conf||[], status:P.status, note:P.note||'', reveal:!!P.reveal, flipped:!!P.flipped}));
   return {format:'bangakbon-ocr', version:1, src:state.name, model:CFG.modelLabel, made:new Date().toISOString(), fileKey:state.fileKey, pages};
 }
 const IDB={ db:null,

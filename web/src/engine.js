@@ -298,6 +298,12 @@ KP.splitSpread = function(g){
   const crop=(x0,x1)=>{ const w=x1-x0, d=new Uint8Array(w*H); for (let y=0;y<H;y++) d.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d}; };
   return [crop(best, W), crop(0, best)];
 };
+// 좌우가 뒤집혀 스캔된 면을 되돌린다
+KP.flipH = function(g){
+  const W=g.w, H=g.h, o=new Uint8Array(W*H);
+  for (let y=0;y<H;y++){ const r=y*W; for (let x=0;x<W;x++) o[r+x]=g.d[r+W-1-x]; }
+  return {w:W, h:H, d:o};
+};
 // 면 사진 너비를 학습 때(위키미디어 공용 스캔, 약 1500px)와 비슷하게 맞춘다
 KP.normWidth = function(im){
   if (im.w>1700 || im.w<1000){ const ow=1500, oh=Math.max(1,Math.round(im.h*ow/im.w)); return resizeBilinear(im, ow, oh); }

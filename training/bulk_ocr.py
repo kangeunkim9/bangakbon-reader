@@ -130,6 +130,16 @@ def newest_model():
 
 # ---------- 한 면 / 한 책 ----------
 def read_face(R, im, no, side, split, srcW, srcH):
+    """처음 6행이 흐리면 좌우가 뒤집혀 스캔된 면인지 뒤집어 읽어 보고, 확실히 나으면 그쪽을 쓴다."""
+    q = _read_face(R, im, no, side, split, srcW, srcH)
+    c0 = float(np.mean(q['conf'][:6])) if q.get('conf') else 0.0
+    if q['status'] != 'empty' and c0 < 0.8:
+        q2 = _read_face(R, ImageOps.mirror(im), no, side, split, srcW, srcH)
+        c1 = float(np.mean(q2['conf'][:6])) if q2.get('conf') else 0.0
+        if c1 >= 0.85 and c1 > c0 + 0.15: q2['flipped'] = True; return q2
+    return q
+
+def _read_face(R, im, no, side, split, srcW, srcH):
     im = norm_width(im)
     q = {'no': no, 'side': side, 'split': split, 'srcW': srcW, 'srcH': srcH, 'W': im.width, 'H': im.height}
     try: t, bt, cols = segment(im)[:3]

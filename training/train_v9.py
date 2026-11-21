@@ -71,6 +71,17 @@ AH = [(f"/content/aihub_lines/{r['img']}", r['text'], r['book']) for r in AH if 
 hold9 = lambda b: '심청전_04' in b
 AHtr = [(p, t) for p, t, b in AH if not hold9(b)]; AHte = [(p, t) for p, t, b in AH if hold9(b)]
 print('AI허브 학습', len(AHtr), '행 / 시험(심청전_04)', len(AHte), '행', flush=True)
+# AI허브 필사본(행 자료는 ㉑ 셀이 만든 aihub_pilsa_lines.zip). 유이양문록 권1은 시험용으로 뺀다.
+PS_tr, PS_te = [], []
+PZ = ROOT + '/aihub_pilsa/aihub_pilsa_lines.zip'
+if os.path.exists(PZ):
+    os.makedirs('/content/pilsa_lines', exist_ok=True)
+    with zipfile.ZipFile(PZ) as z: z.extractall('/content/pilsa_lines')
+    for l in open('/content/pilsa_lines/lines.jsonl', encoding='utf-8'):
+        r = json.loads(l); pth = '/content/pilsa_lines/' + r['img']
+        if len(G(r['text'])) < 3 or not os.path.exists(pth): continue
+        (PS_te if re.search(r'유이양문록1_', r['book']) else PS_tr).append((pth, r['text']))
+print('AI허브 필사본 학습', len(PS_tr), '행 / 시험(유이양문록 권1)', len(PS_te), '행', flush=True)
 
 # ---------------- 4) 덧붙임을 늘린 전처리 ----------------
 def lowres(im):
@@ -108,7 +119,7 @@ class LineDS9(torch.utils.data.Dataset):
 
 # ---------------- 5) 8차 가중치에서 시작 ----------------
 m8, cs8 = load_model(ROOT + '/gyeongpan_model_v8.pt', DEV)
-cs9 = Charset(list(cs8.chars) + [t for _, t in INTR])
+cs9 = Charset(list(cs8.chars) + [t for _, t in INTR + PS_tr + PS_te])
 print('자모', len(cs8.chars), '→', len(cs9.chars), '종', flush=True)
 random.seed(0); torch.manual_seed(0)
 m9 = CRNN(len(cs9)).to(DEV); sd = m8.state_dict(); own = m9.state_dict()
@@ -119,15 +130,26 @@ for c, i in cs8.idx.items():
 own['fc.weight'][0] = sd['fc.weight'][0]; own['fc.bias'][0] = sd['fc.bias'][0]; m9.load_state_dict(own)
 c8 = cer(predict(m8, cs8, [p for p, _ in KVA], DEV), [t for _, t in KVA]); print(f'8차 경판 검증 {c8*100:.2f}%', flush=True)
 
-# ---------------- 6) 학습 ----------------
+# ---------------- 6) 학습 (에폭마다 드라이브에 저장하고, 끊기면 이어서 한다) ----------------
 EP = 15; NAH = min(len(AHtr), 25000); BS = 16; LR = 3e-4; REP_IN = 3
-per = len(KTR) + REP_IN * len(INTR) + NAH; steps = EP * (per // BS)
+per = len(KTR) + REP_IN * len(INTR) + NAH + len(PS_tr); steps = EP * (per // BS)
 opt = torch.optim.AdamW(m9.parameters(), lr=LR, weight_decay=1e-4); sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=LR, total_steps=steps, pct_start=0.1)
-ctc = nn.CTCLoss(blank=0, zero_infinity=True); best = c8; log9 = []
-SAVE9 = '/content/gyeongpan_model_v9.pt'
-torch.save({'state': m9.state_dict(), 'chars': cs9.chars, 'H': H}, SAVE9)
-for ep in range(1, EP + 1):
-    tr = KTR + INTR * REP_IN + random.sample(AHtr, NAH)
+ctc = nn.CTCLoss(blank=0, zero_infinity=True)
+PSV = random.Random(2).sample(PS_te, min(600, len(PS_te)))
+def val_score(m, cs):
+    k = cer(predict(m, cs, [p for p, _ in KVA], DEV), [t for _, t in KVA])
+    q = cer(predict(m, cs, [p for p, _ in PSV], DEV), [t for _, t in PSV]) if PSV else 0.0
+    return k, q
+CK = ROOT + '/ckpt_v9.pt'; SAVE9 = '/content/gyeongpan_model_v9.pt'; ep0 = 1; best9 = None; log9 = []
+if os.path.exists(CK):
+    ck = torch.load(CK, map_location=DEV)
+    if ck.get('chars') == cs9.chars and ck.get('per') == per:
+        m9.load_state_dict(ck['state']); opt.load_state_dict(ck['opt']); sch.load_state_dict(ck['sch'])
+        ep0 = ck['ep'] + 1; best9 = ck['best9']; log9 = ck['log']; print('이어서 학습:', ep0, '에폭부터', flush=True)
+        if os.path.exists(ROOT + '/gyeongpan_model_v9_진행중.pt'): shutil.copy(ROOT + '/gyeongpan_model_v9_진행중.pt', SAVE9)
+q8 = val_score(m8, cs8)[1]; print(f'8차 필사본 시험(유이양문록 권1 행) {q8*100:.2f}%', flush=True)
+for ep in range(ep0, EP + 1):
+    tr = KTR + INTR * REP_IN + random.sample(AHtr, NAH) + PS_tr
     dl = torch.utils.data.DataLoader(LineDS9(tr, cs9, True), batch_size=BS, shuffle=True, num_workers=2, collate_fn=collate, drop_last=True)
     m9.train(); t0 = time.time(); tot = 0; n = 0
     for x, tg in dl:
@@ -136,16 +158,17 @@ for ep in range(1, EP + 1):
         opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(m9.parameters(), 5); opt.step()
         if sch.last_epoch + 1 < steps: sch.step()
         tot += loss.item(); n += 1
-    c = cer(predict(m9, cs9, [p for p, _ in KVA], DEV), [t for _, t in KVA]); log9.append((ep, tot / n, c))
-    if c < best:
-        best = c; torch.save({'state': m9.state_dict(), 'chars': cs9.chars, 'H': H}, SAVE9); shutil.copy(SAVE9, ROOT + '/gyeongpan_model_v9_진행중.pt')
-    print(f'epoch {ep:2d}  loss {tot/n:.3f}  경판 검증 {c*100:.2f}% (8차 {c8*100:.2f}%, 최고 {best*100:.2f}%)  {time.time()-t0:.0f}s', flush=True)
+    k, q = val_score(m9, cs9); sc = k + q; log9.append((ep, tot / n, k, q))
+    if best9 is None or sc < best9:
+        best9 = sc; torch.save({'state': m9.state_dict(), 'chars': cs9.chars, 'H': H}, SAVE9); shutil.copy(SAVE9, ROOT + '/gyeongpan_model_v9_진행중.pt')
+    torch.save({'state': m9.state_dict(), 'opt': opt.state_dict(), 'sch': sch.state_dict(), 'ep': ep, 'best9': best9, 'log': log9, 'chars': cs9.chars, 'per': per}, CK)
+    print(f'epoch {ep:2d}  loss {tot/n:.3f}  경판 검증 {k*100:.2f}% (8차 {c8*100:.2f}%)  필사본 {q*100:.2f}% (8차 {q8*100:.2f}%)  {time.time()-t0:.0f}s', flush=True)
 m9b, cs9b = load_model(SAVE9, DEV)
 torch.save({'state': m9b.state_dict(), 'chars': cs9b.chars, 'H': H, 'arch': 'CRNN'}, ROOT + '/gyeongpan_model_v9.pt')
 
 # ---------------- 7) 시험 ----------------
 from rapidfuzz.distance import Levenshtein as Lv
-R9 = {'val_v8': c8, 'val_v9': best}
+R9 = {'val_v8': c8, 'pilsa_v8': q8}; R9['val_v9'], R9['pilsa_v9'] = val_score(m9b, cs9b)
 sm = random.Random(1).sample(AHte, min(800, len(AHte)))
 R9['simcheong_v8'] = cer(predict(m8, cs8, [p for p, _ in sm], DEV), [t for _, t in sm])
 R9['simcheong_v9'] = cer(predict(m9b, cs9b, [p for p, _ in sm], DEV), [t for _, t in sm])
@@ -174,8 +197,9 @@ def geum(path):
 R9['geum_v8'] = geum(ROOT + '/gyeongpan_model_v8.pt'); R9['geum_v9'] = geum(ROOT + '/gyeongpan_model_v9.pt')
 print(f"\n[경판 검증]          8차 {R9['val_v8']*100:.2f}% → 9차 {R9['val_v9']*100:.2f}%")
 print(f"[금향졍긔 뒤쪽 절반]  8차 {R9['geum_v8']*100:.2f}% → 9차 {R9['geum_v9']*100:.2f}%  (언어 모델 없이)")
+print(f"[필사본 유이양문록 권1 행] 8차 {R9['pilsa_v8']*100:.2f}% → 9차 {R9['pilsa_v9']*100:.2f}%")
 print(f"[AI허브 심청전_04]   8차 {R9['simcheong_v8']*100:.2f}% → 9차 {R9['simcheong_v9']*100:.2f}%")
-json.dump({'result': R9, 'log': log9, 'n_kyeong': len(KTR), 'n_inbox': len(INTR), 'n_aihub': len(AHtr)}, open(ROOT + '/result_v9.json', 'w'), ensure_ascii=False)
+json.dump({'result': R9, 'log': log9, 'n_kyeong': len(KTR), 'n_inbox': len(INTR), 'n_aihub': len(AHtr), 'n_pilsa': len(PS_tr)}, open(ROOT + '/result_v9.json', 'w'), ensure_ascii=False)
 
 # ---------------- 8) 웹용 내보내기 (배치 축도 가변, 9MB 조각) ----------------
 import onnxruntime as ort

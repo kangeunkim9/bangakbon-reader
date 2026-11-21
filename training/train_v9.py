@@ -71,7 +71,7 @@ AH = [(f"/content/aihub_lines/{r['img']}", r['text'], r['book']) for r in AH if 
 hold9 = lambda b: '심청전_04' in b
 AHtr = [(p, t) for p, t, b in AH if not hold9(b)]; AHte = [(p, t) for p, t, b in AH if hold9(b)]
 print('AI허브 학습', len(AHtr), '행 / 시험(심청전_04)', len(AHte), '행', flush=True)
-# AI허브 필사본(행 자료는 ㉑ 셀이 만든 aihub_pilsa_lines.zip). 유이양문록 권1은 시험용으로 뺀다.
+# AI허브 필사본(행 자료는 ㉑ 셀이 만든 aihub_pilsa_lines.zip). 유이양문록 전부와 명행정의록 권8은 시험용으로 뺀다.
 PS_tr, PS_te = [], []
 PZ = ROOT + '/aihub_pilsa/aihub_pilsa_lines.zip'
 if os.path.exists(PZ):
@@ -80,8 +80,8 @@ if os.path.exists(PZ):
     for l in open('/content/pilsa_lines/lines.jsonl', encoding='utf-8'):
         r = json.loads(l); pth = '/content/pilsa_lines/' + r['img']
         if len(G(r['text'])) < 3 or not os.path.exists(pth): continue
-        (PS_te if re.search(r'유이양문록1_', r['book']) else PS_tr).append((pth, r['text']))
-print('AI허브 필사본 학습', len(PS_tr), '행 / 시험(유이양문록 권1)', len(PS_te), '행', flush=True)
+        (PS_te if re.search(r'유이양문록|명행정의록8_', r['book']) else PS_tr).append((pth, r['text']))
+print('AI허브 필사본 학습', len(PS_tr), '행 / 시험(유이양문록·명행정의록8)', len(PS_te), '행', flush=True)
 
 # ---------------- 4) 덧붙임을 늘린 전처리 ----------------
 def lowres(im):
@@ -147,7 +147,7 @@ if os.path.exists(CK):
         m9.load_state_dict(ck['state']); opt.load_state_dict(ck['opt']); sch.load_state_dict(ck['sch'])
         ep0 = ck['ep'] + 1; best9 = ck['best9']; log9 = ck['log']; print('이어서 학습:', ep0, '에폭부터', flush=True)
         if os.path.exists(ROOT + '/gyeongpan_model_v9_진행중.pt'): shutil.copy(ROOT + '/gyeongpan_model_v9_진행중.pt', SAVE9)
-q8 = val_score(m8, cs8)[1]; print(f'8차 필사본 시험(유이양문록 권1 행) {q8*100:.2f}%', flush=True)
+q8 = val_score(m8, cs8)[1]; print(f'8차 필사본 시험 행 {q8*100:.2f}%', flush=True)
 for ep in range(ep0, EP + 1):
     tr = KTR + INTR * REP_IN + random.sample(AHtr, NAH) + PS_tr
     dl = torch.utils.data.DataLoader(LineDS9(tr, cs9, True), batch_size=BS, shuffle=True, num_workers=2, collate_fn=collate, drop_last=True)
@@ -197,7 +197,7 @@ def geum(path):
 R9['geum_v8'] = geum(ROOT + '/gyeongpan_model_v8.pt'); R9['geum_v9'] = geum(ROOT + '/gyeongpan_model_v9.pt')
 print(f"\n[경판 검증]          8차 {R9['val_v8']*100:.2f}% → 9차 {R9['val_v9']*100:.2f}%")
 print(f"[금향졍긔 뒤쪽 절반]  8차 {R9['geum_v8']*100:.2f}% → 9차 {R9['geum_v9']*100:.2f}%  (언어 모델 없이)")
-print(f"[필사본 유이양문록 권1 행] 8차 {R9['pilsa_v8']*100:.2f}% → 9차 {R9['pilsa_v9']*100:.2f}%")
+print(f"[필사본 시험 행]      8차 {R9['pilsa_v8']*100:.2f}% → 9차 {R9['pilsa_v9']*100:.2f}%")
 print(f"[AI허브 심청전_04]   8차 {R9['simcheong_v8']*100:.2f}% → 9차 {R9['simcheong_v9']*100:.2f}%")
 json.dump({'result': R9, 'log': log9, 'n_kyeong': len(KTR), 'n_inbox': len(INTR), 'n_aihub': len(AHtr), 'n_pilsa': len(PS_tr)}, open(ROOT + '/result_v9.json', 'w'), ensure_ascii=False)
 

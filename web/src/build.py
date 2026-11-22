@@ -17,6 +17,7 @@ SK = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
       '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
       '<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}'
       'body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>'
+      '<script data-goatcounter="https://kangeunkim9.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>'
       '</head><body>')
 open(f'{H}/../index.html', 'w', encoding='utf-8').write(SK + gh + '</body></html>\n')
 print('web/index.html', len(gh))

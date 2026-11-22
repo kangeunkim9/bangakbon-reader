@@ -306,7 +306,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 창을 닫으면 사라지니 저장하거나 복사해 두세요.</p>
       <p>검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
     </div>
-        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 판독 모델의 학습용 정답과 언어 모델 보정에는 국립국어원 「국어 역사 자료 말뭉치 2024」(KOHICO)를, 띄어쓰기 모델 학습에는 한국학중앙연구원 장서각의 국문장편소설 전사문을 활용했습니다. 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
+        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실. 원문 사진은 위키미디어 공용에 공개된 국립중앙도서관 소장본을, 판독 모델의 학습용 정답과 언어 모델 보정에는 국립국어원 「국어 역사 자료 말뭉치 2024」(KOHICO)를, 띄어쓰기 모델 학습에는 한국학중앙연구원 장서각의 국문장편소설 전사문을 활용했습니다. 이용 통계는 GoatCounter로 쿠키 없이 익명으로 모읍니다(방문 수와 버튼을 누른 횟수만). 소스 코드는 <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a>에 있습니다.</p>
   </section>
 </div>
 
@@ -449,7 +449,9 @@ function previewURL(g){ // 화면용 축소 사진
 
 // ---------- 판독 ----------
 const median = (a)=>{ const s=[...a].sort((x,y)=>x-y); return s.length? s[s.length>>1] : 0; };
-async function run(){
+// 이용 통계(GoatCounter, 쿠키 없음): 버튼을 누른 횟수만 센다
+function gc(name){ try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({path:'event/'+name, title:name, event:true}); } catch(e){} }
+async function run(){ gc('판독');
   if (!state.file || state.running) return;
   const useLM = $('lm').checked;
   state.running=true; state.stop=false; $('go').disabled=true; $('stop').hidden=false;
@@ -867,6 +869,7 @@ async function spacedAll(){
 }
 $('spaceBtn').onclick=async()=>{
   if (!state.pages.length){ setMsg('먼저 판독하고, 판독문을 확인한 뒤에 눌러 주세요.'); return; }
+  gc('띄어쓰기');
   setMsg('띄어 쓰는 중…');
   try { $('spaceText').value=await spacedAll(); $('spaceBox').hidden=false; $('spaceBox').scrollIntoView({behavior:'smooth'}); setMsg('띄어쓴 전사문을 만들었어요. 아래에서 확인하고 고칠 수 있어요.'); }
   catch(e){ setMsg('띄어쓰기 모델을 불러오지 못했어요: '+e.message, true); }
@@ -910,7 +913,7 @@ async function sendInbox(P){
     const j=await r.json();
     if (!j.ok) throw {code:j.error};
     SENT.set(pageKey(P), doc); renderPages(); loadCounts();
-    setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
+    gc('학습용보내기'); setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개. 고맙습니다. 다른 면도 고쳐 주시려면 위의 '고칠 면 하나 받기'를 누르세요.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='daily_limit') setMsg('오늘 받을 수 있는 분량이 찼습니다. 내일 다시 보내 주세요.', true);
@@ -942,7 +945,7 @@ async function sendTrain(){
       lines:trainLines(P), note:(P.note||'').slice(0,2000), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
     await DB.collection('training').doc(key).set(doc);
     SENT.set(key, doc); renderPages();
-    setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개.`);
+    gc('학습용보내기'); setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개.`);
   } catch(e){
     const c=e&&e.code;
     if (c==='quota_exceeded'||c==='quota_or_state') setMsg('학습 자료 저장 공간이 찼습니다. 고전소설 연구실에 알려 주세요.', true);
@@ -1112,7 +1115,7 @@ async function commonsPage(title, want){
 }
 // 미리 판독한 결과 (Colab에서 책 단위로 읽어 pre/ 폴더에 올려 둔 것). 있으면 엔진 없이 바로 띄운다.
 let PREIDX=null; const PREBOOK={};
-async function preBook(title){
+async function preBook(title){ gc('고칠면받기');
   if (!CFG.github) return null;
   try {
     if (!PREIDX) PREIDX=fetch('pre/index.json').then(r=>r.ok?r.json():{books:{}}).catch(()=>({books:{}}));

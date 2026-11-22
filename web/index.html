@@ -185,7 +185,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 <div class="wrap">
   <header class="head">
     <h1>방각본 고전소설 판독기</h1>
-    <span class="tag" id="ver">시험판 · 판독 모델 9차 · 2026.11</span>
+    <span class="tag" id="ver">시험판 · 판독 모델 10차 · 2026.11</span>
     <button class="reportbtn" id="reportOpen" type="button" aria-expanded="false">문제 알리기</button>
     <p class="by">성균관대학교 국어국문학과 고전소설 연구실</p>
   </header>
@@ -297,8 +297,8 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     </div>
     <div>
       <h3>정확도</h3>
-      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분을 면째로 읽으면 글자 오류율 <b class="num">5.0%</b>입니다(8차 5.3%)<span class="lmonly">. 언어 모델 보정을 켜면 더 낮아집니다</span>. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
-      <p>지금 판독 모델(9차)은 경판 17종, AI허브 옛한글 목판본 약 14만 행에 AI허브 필사본(장서각 국문장편소설) 약 2만 9천 행을 더해 학습했습니다. 학습에 쓰지 않은 AI허브 완판 심청전에서는 오류율이 <b class="num">2.9%</b>, 학습에 쓰지 않은 장서각 필사본(유이양문록 등)은 행을 바르게 잘라 주었을 때 <b class="num">6.0%</b>입니다(8차 18.0%). 필사본은 면 사진에서 행을 찾는 단계에서 오류가 더 생길 수 있고, 궁체가 아닌 흘림 필사본은 아직 잘 못 읽습니다. 판독문은 검토용 초벌로 쓰세요.</p>
+      <p>학습에 쓰지 않은 금향졍긔 권하 뒷부분을 면째로 읽으면 글자 오류율 <b class="num">4.4%</b>입니다(9차 5.2%)<span class="lmonly">. 언어 모델 보정을 켜면 더 낮아집니다</span>. KOHICO 전사를 자동으로 맞춘 정답 기준이어서 실제 오류율은 이보다 조금 낮습니다.</p>
+      <p>지금 판독 모델(10차)은 경판 17종, AI허브 옛한글 목판본 약 14만 행에 AI허브 필사본(장서각 국문장편소설) 약 2만 9천 행을 더해 학습했습니다. 10차부터는 반복 부호(〃)를 원문 표기대로 읽도록 정답을 바로잡아 다시 학습했습니다. 학습에 쓰지 않은 AI허브 완판 심청전에서는 오류율이 <b class="num">3.0%</b>, 학습에 쓰지 않은 장서각 필사본(유이양문록 등)은 행을 바르게 잘라 주었을 때 <b class="num">6.2%</b>입니다. 필사본은 면 사진에서 행을 찾는 단계에서 오류가 더 생길 수 있고, 궁체가 아닌 흘림 필사본은 아직 잘 못 읽습니다. 판독문은 검토용 초벌로 쓰세요.</p>
     </div>
     <div>
       <h3>자료와 저장</h3>
@@ -630,8 +630,8 @@ window.KP = KP;
 </script>
 <script>
 const CFG = {
-  model: ['model_v9_0.wasm','model_v9_1.wasm','model_v9_2.wasm','model_v9_3.wasm'], modelLabel: '9차 모델',
-  lm: 'lm7.gz.wasm', spacer: 'spacer.wasm', spacerVocab: 'spacer_vocab.json', charset: 'charset_v9.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], modelLabel: '10차 모델',
+  lm: 'lm7.gz.wasm', spacer: 'spacer.wasm', spacerVocab: 'spacer_vocab.json', charset: 'charset_v10.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
   approxMB: 47, github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;

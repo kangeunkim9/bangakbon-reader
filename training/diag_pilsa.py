@@ -19,10 +19,9 @@ for i, r in enumerate(R): r['src'] = 'TS' if i < N_TS else 'VS'
 print('전체', len(R), '/ 앞 행 예:', {k: R[0][k] for k in R[0] if k != 'text'}, '/ 뒤 행 예:', {k: R[-1][k] for k in R[-1] if k != 'text'}, flush=True)
 m, cs = load_model(ROOT + '/gyeongpan_model_v10.pt', DEV)
 rnd = random.Random(7); out = {}
-from rapidfuzz.distance import Levenshtein as Lv
 def run(rows):
     pr = predict(m, cs, [PD + '/' + r['img'] for r in rows], DEV)
-    return [(Lv.distance(p, r['text']) / max(1, len(r['text'])), p, r) for p, r in zip(pr, rows)]
+    return [(lev(graphemes(p), graphemes(r['text'])) / max(1, len(graphemes(r['text']))), p, r) for p, r in zip(pr, rows)]
 for src in ('TS', 'VS'):
     rows = [r for r in R if r['src'] == src and os.path.exists(PD + '/' + r['img'])]
     smp = rnd.sample(rows, 800); res = run(smp); out[src] = res

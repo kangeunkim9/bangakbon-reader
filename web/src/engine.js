@@ -353,6 +353,27 @@ KP.splitSpread = function(g){
   const crop=(x0,x1)=>{ const w=x1-x0, d=new Uint8Array(w*H); for (let y=0;y<H;y++) d.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d}; };
   return [crop(best, W), crop(0, best)];
 };
+// 필사본 펼친 면: 두 면 사이 틈이 행 사이 틈과 비슷해 골로는 못 찾는다. 대신 종이가 찍힌 폭의 한가운데를
+// 두 면 사이로 보고(두 면 너비가 같다), 그 근처(±2%)에서 먹이 가장 옅은 곳을 고른다. 종이 폭을 못 찾으면 원래 방식.
+KP.splitSpreadPaper = function(g){
+  if (g.w < g.h*1.15) return [g];
+  const W=g.w, H=g.h, y0=Math.floor(H*0.1), y1=Math.floor(H*0.9), paper=new Uint8Array(W);
+  const hist=new Int32Array(256);
+  for (let x=0;x<W;x++){
+    hist.fill(0); for (let y=y0;y<y1;y++) hist[g.d[y*W+x]]++;
+    let need=Math.floor((y1-y0)*0.8), v=0; for (;v<256;v++){ need-=hist[v]; if (need<0) break; }   // 80번째 백분위
+    paper[x] = v>140 ? 1 : 0;
+  }
+  let L=-1, R=-1, s=-1;
+  for (let x=0;x<=W;x++){ const on = x<W && paper[x]; if (on && s<0) s=x; if (!on && s>=0){ if (x-s > R-L){ L=s; R=x-1; } s=-1; } }
+  if (R-L < W*0.7) return KP.splitSpread(g);
+  const mid=Math.round((L+R)/2), b=binar(g), vl=open1d(b, W, H, Math.floor(H/4), true), col=new Float64Array(W);
+  for (let y=y0;y<y1;y++) for (let x=0;x<W;x++){ const i=y*W+x; col[x]+=b[i]&(1-vl[i]); }
+  const sm=convSame(Array.from(col), 9), d=Math.round(W*0.02);
+  let best=mid; for (let x=Math.max(1,mid-d); x<Math.min(W-1,mid+d); x++) if (sm[x]<sm[best]) best=x;
+  const crop=(x0,x1)=>{ const w=x1-x0, o=new Uint8Array(w*H); for (let y=0;y<H;y++) o.set(g.d.subarray(y*W+x0, y*W+x1), y*w); return {w, h:H, d:o}; };
+  return [crop(best, W), crop(0, best)];
+};
 // 좌우가 뒤집혀 스캔된 면을 되돌린다
 KP.flipH = function(g){
   const W=g.w, H=g.h, o=new Uint8Array(W*H);

@@ -131,6 +131,13 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .vert .lines li .no{writing-mode:horizontal-tb;text-align:center}
 .vert .lines li.edited .no::after{content:""}
 .vert .lines li .tx{font-size:1.25rem;line-height:1.5}
+.splitdlg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.splitdlg .box{background:var(--bg);color:var(--ink);border-radius:var(--r);padding:14px;max-width:min(1100px,100%);max-height:100%;overflow:auto;display:grid;gap:10px}
+.splitdlg .stage{position:relative;cursor:ew-resize;touch-action:none}
+.splitdlg .stage img{display:block;width:100%;height:auto}
+.splitdlg svg{position:absolute;inset:0;width:100%;height:100%}
+.splitdlg line{stroke:#d33;stroke-width:6;vector-effect:non-scaling-stroke}
+.splitdlg .acts{display:flex;flex-wrap:wrap;gap:8px}
 .notice{margin:10px 14px;padding:10px 12px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn);font-size:.86rem}
 .foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .foot .sp{flex:1}
@@ -473,15 +480,19 @@ function prepCol(g, seg, k){
   }
   return KP.prepLine(g,x0,x1,seg.t,seg.bt);
 }
-async function run(){ gc('판독'+(state.kind==='pilsa'?'_필사본':''));
+async function run(only){ if (typeof only!=='number') only=0; if (!only) gc('판독'+(state.kind==='pilsa'?'_필사본':''));
   if (!state.file || state.running) return;
-  const useLM = $('lm').checked; state.runKind = state.kind;
+  const useLM = only ? !!state.useLM : $('lm').checked; if (!only){ state.runKind = state.kind; state.splitAt = {}; }
+  let ins = -1;   // 한 쪽만 다시 읽을 때(두 면 나눈 곳을 고친 뒤) 그 쪽이 있던 자리
   state.running=true; state.stop=false; $('go').disabled=true; $('stop').hidden=false;
   const prevPages = state.pages, prevName = state.name;
   try {
     let eng = state.imp ? null : await loadEngine(useLM);   // 미리 판독한 결과만 띄울 때는 엔진을 받지 않는다
-    state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; renderPages();
-    const a=+$('p0').value||1, b=+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
+    if (only){ ins = state.pages.findIndex(p=>p.no===only); if (ins<0) ins=state.pages.length; state.pages = state.pages.filter(p=>p.no!==only); }
+    else { state.pages=[]; state.name=state.file.srcName||state.file.name.replace(/\.[^.]+$/,''); state.fileKey=fnv(state.file.name+'|'+state.file.size); state.cur=0; state.useLM=useLM; }
+    renderPages();
+    const nBefore = state.pages.length;
+    const a=only||+$('p0').value||1, b=only||+$('p1').value||0; let done=0, lineMs=[], t0=performance.now();
     for await (let [no,g,side,iq,meta] of halves(pagesOf(state.file,a,b))){
       const ow = g.w; g = KP.normWidth(g); const lab = no+'쪽'+(side?' '+side:'');
       if (state.stop) break;
@@ -550,6 +561,7 @@ async function run(){ gc('판독'+(state.kind==='pilsa'?'_필사본':''));
       }
       done++; state.dirty=true; renderPages(); if (state.cur===idx) renderCurrent();
     }
+    if (only){ const got=state.pages.splice(nBefore); state.pages.splice(ins,0,...got); state.cur=ins; state.dirty=true; }
     const nOK = state.pages.filter(p=>p.status==='ok').length;
     setMsg(`${state.stop?'멈춤. ':''}${state.pages.length}쪽 가운데 본문 ${nOK}면 판독 완료 (${fmtTime((performance.now()-t0)/1000)}). 판독문을 고친 뒤 저장하세요.`);
     setBar(1); renderAll();
@@ -559,6 +571,26 @@ async function run(){ gc('판독'+(state.kind==='pilsa'?'_필사본':''));
   } finally { state.running=false; $('go').disabled=!state.file; $('stop').hidden=true; renderTrain(); }
 }
 const idle = ()=>new Promise(r=>setTimeout(r,0));
+// 두 면 나눈 곳 고치기: 펼친 사진 위에 세로선을 끌어 옮기고, 그 쪽을 다시 읽는다
+async function openSplit(P){
+  if (state.running) return;
+  let g=null; for await (const [no,gg] of pagesOf(state.file,P.no,P.no)){ g=gg; break; }
+  if (!g) return;
+  const url=await previewURL(g); let x = P.split ? (P.side==='오른쪽' ? P.split[0] : P.split[1]) : Math.round(g.w/2);
+  const dlg=document.createElement('div'); dlg.className='splitdlg';
+  dlg.innerHTML=`<div class="box" role="dialog" aria-label="두 면 나눈 곳 고치기"><p><b>${esc(String(P.no))}쪽</b> 두 면 사이에 선을 맞춰 주세요. 선을 끌거나 사진을 누르면 옮겨집니다. 이 쪽의 판독문과 고친 내용은 새로 읽은 것으로 바뀝니다.</p>
+  <div class="stage"><img src="${url}" width="${g.w}" height="${g.h}" alt="펼친 면 사진"><svg viewBox="0 0 ${g.w} ${g.h}" preserveAspectRatio="none"><line id="spl" x1="${x}" x2="${x}" y1="0" y2="${g.h}"/></svg></div>
+  <div class="acts"><button class="primary" type="button" data-a="go">이 자리로 다시 읽기</button><button type="button" data-a="one">나누지 않고 한 면으로</button><button type="button" data-a="x">닫기</button></div></div>`;
+  document.body.appendChild(dlg);
+  const st=dlg.querySelector('.stage'), ln=dlg.querySelector('#spl');
+  const move=e=>{ const r=st.getBoundingClientRect(); x=Math.round(Math.max(0.05,Math.min(0.95,(e.clientX-r.left)/r.width))*g.w); ln.setAttribute('x1',x); ln.setAttribute('x2',x); };
+  let drag=false; st.addEventListener('pointerdown',e=>{ drag=true; st.setPointerCapture(e.pointerId); move(e); });
+  st.addEventListener('pointermove',e=>{ if (drag) move(e); }); st.addEventListener('pointerup',()=>{ drag=false; });
+  const close=()=>dlg.remove();
+  dlg.addEventListener('click',async e=>{ const a=e.target.dataset && e.target.dataset.a; if (!a) return;
+    if (a==='x'){ close(); return; }
+    (state.splitAt=state.splitAt||{})[P.no] = a==='one' ? 0 : x; close(); gc('두면나누기고침'); await run(P.no); });
+}
 // 두 면이 나란히 찍힌 사진은 오른쪽 면부터 따로 읽는다
 async function* halves(gen){ for await (const [no,g] of gen){
   const ip = state.imp ? state.imp.pages.filter(q=>q.no===no) : [];
@@ -566,7 +598,8 @@ async function* halves(gen){ for await (const [no,g] of gen){
     const sc = g.w/(ip[0].srcW||g.w);
     for (const q of ip){ yield [no, q.split ? cropX(g, Math.round(q.split[0]*sc), Math.round(q.split[1]*sc)) : g, q.side||'', q, {split:q.split||null, srcW:q.srcW||g.w}]; }
     continue; }
-  const parts=KP.splitSpread(g);
+  const fx = state.splitAt && state.splitAt[no];
+  const parts = fx===undefined ? (state.runKind==='pilsa' ? KP.splitSpreadPaper(g) : KP.splitSpread(g)) : fx<=0 ? [g] : [cropX(g,fx,g.w), cropX(g,0,fx)];
   if (parts.length<2) yield [no,g,'',null,{split:null, srcW:g.w}];
   else { const x=g.w-parts[0].w; yield [no,parts[0],'오른쪽',null,{split:[x,g.w], srcW:g.w}]; yield [no,parts[1],'왼쪽',null,{split:[0,x], srcW:g.w}]; } } }
 function cropX(g,x0,x1){ x0=Math.max(0,x0); x1=Math.min(g.w,x1); const w=x1-x0, d=new Uint8Array(w*g.h); for (let y=0;y<g.h;y++) d.set(g.d.subarray(y*g.w+x0, y*g.w+x1), y*w); return {w, h:g.h, d}; }
@@ -627,6 +660,10 @@ function renderCurrent(partial){
   const ta=document.createElement('textarea'); ta.rows=2; ta.placeholder='행 나누기가 틀린 곳, 빠진 행의 위치, 훼손·판독 불가 등 남길 말'; ta.value=P.note||'';
   ta.addEventListener('input',()=>{ P.note=ta.value; state.dirty=true; }); lab.appendChild(ta);
   tools.append(add,lab); body.appendChild(tools);
+  if ((P.split || P.W>P.H*1.15) && !state.imp && state.file){
+    const sb=document.createElement('button'); sb.type='button'; sb.textContent='두 면 나눈 곳 고치기'; sb.title='펼친 면을 두 쪽으로 가른 자리가 틀렸으면 가운데 선을 옮겨 이 쪽을 다시 읽습니다';
+    sb.onclick=()=>openSplit(P); add.after(sb);
+  }
   if (active>=0) select(active,false);
 }
 function lineItem(P,k){

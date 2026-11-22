@@ -42,6 +42,26 @@ def split_spread(im):
     if sm[x] > med * 0.6: return [(im, '', None)]
     return [(im.crop((x, 0, W, Hh)), '오른쪽', [x, W]), (im.crop((0, 0, x, Hh)), '왼쪽', [0, x])]
 
+def split_spread_paper(im):
+    """필사본 펼친 면: 종이가 찍힌 폭의 한가운데 근처(±2%)에서 먹이 가장 옅은 곳으로 나눈다. (KP.splitSpreadPaper와 같은 규칙)"""
+    W, Hh = im.size
+    if W < Hh * 1.15: return [(im, '', None)]
+    g = np.asarray(im.convert('L'), dtype=np.float32)[int(Hh * 0.1):int(Hh * 0.9)]
+    paper = np.percentile(g, 80, axis=0) > 140
+    best = (0, 0, -1); s = None
+    for x in range(W + 1):
+        on = x < W and paper[x]
+        if on and s is None: s = x
+        if not on and s is not None:
+            if x - s > best[0]: best = (x - s, s, x - 1)
+            s = None
+    if best[0] < W * 0.7: return split_spread(im)
+    mid = round((best[1] + best[2]) / 2)
+    b = binar(im); vl = cv2.morphologyEx(b, cv2.MORPH_OPEN, np.ones((Hh // 4, 1), np.uint8))
+    col = (b & (1 - vl))[int(Hh * 0.1):int(Hh * 0.9)].sum(0).astype(float); sm = np.convolve(col, np.ones(9) / 9, 'same')
+    d = round(W * 0.02); lo = max(1, mid - d); x = lo + int(np.argmin(sm[lo:min(W - 1, mid + d)]))
+    return [(im.crop((x, 0, W, Hh)), '오른쪽', [x, W]), (im.crop((0, 0, x, Hh)), '왼쪽', [0, x])]
+
 def norm_width(im):
     W, Hh = im.size
     if W > 1700 or W < 1000: return im.resize((1500, max(1, round(Hh * 1500 / W))), Image.BILINEAR)

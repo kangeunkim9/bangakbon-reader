@@ -64,3 +64,35 @@ def segment(im):
     if frame: t,bt=T+4,B-4
     t,bt=vbounds(b,t,bt)
     return t,bt,cols[::-1]
+
+
+# ---------- 필사본용 휜 행 경계 (engine.js의 KP.seams, KP.prepLineCurved와 같은 방식) ----------
+def seams(g, t, bt, cols):
+    """곧은 경계를 출발점으로, 먹을 덜 지나는 휜 경계(위→아래 단조, 서로 안 겹침)를 동적 계획법으로 찾는다."""
+    b=binar(g); Hh,W=b.shape
+    lines=cv2.morphologyEx(b,cv2.MORPH_OPEN,np.ones((Hh//4,1),np.uint8))
+    ink=cv2.GaussianBlur((b&(1-lines)).astype(np.float32),(0,0),2.5)
+    xs=sorted({x for ac in cols for x in ac}); pitch=np.median(np.diff(xs)) if len(xs)>1 else 80
+    paths=[]
+    for i,x in enumerate(xs):
+        lo=int(max(0,x-0.4*pitch, (xs[i-1]+x)/2+1 if i else 0)); hi=int(min(W-1,x+0.4*pitch,(xs[i+1]+x)/2-1 if i+1<len(xs) else W-1))
+        C=ink[t:bt,lo:hi+1]; n=C.shape[1]; D=C[0].copy()+0.002*np.abs(np.arange(lo,hi+1)-x); P=np.zeros(C.shape,np.int8)
+        for y in range(1,C.shape[0]):
+            cand=np.stack([np.r_[np.inf,D[:-1]]+0.03, D, np.r_[D[1:],np.inf]+0.03])
+            k=cand.argmin(0); D=cand[k,np.arange(n)]+C[y]; P[y]=k-1
+        j=int(D.argmin()); path=np.zeros(C.shape[0],int)
+        for y in range(C.shape[0]-1,-1,-1): path[y]=j; j+=P[y,j]
+        paths.append(path+lo)
+    return xs, paths, b
+
+def crop_curved(g, t, bt, L, R, pad=3):
+    """휜 두 경계 사이를 잘라, 행 가운데가 곧게 서도록 줄마다 옮겨 붙인다. 경계 밖은 흰색."""
+    a=np.asarray(g); c=(L+R)/2.0; k=max(31,(len(c)//8)|1)
+    cs=np.convolve(np.pad(c,(k//2,k//2),mode='edge'),np.ones(k)/k,'valid')
+    half=int(np.max(np.maximum(cs-L,R-cs)))+pad; w=2*half+1
+    out=np.full((len(c),w),255,np.uint8)
+    for y in range(len(c)):
+        x0=int(round(cs[y]))-half; l=max(L[y]-pad,0); r=min(R[y]+pad,a.shape[1]-1)
+        xa,xb=max(x0,l),min(x0+w-1,r)
+        if xb>=xa: out[y,xa-x0:xb-x0+1]=a[t+y,xa:xb+1]
+    return Image.fromarray(out)

@@ -166,6 +166,61 @@ KP.segment = function(im){
   return {t, bt, cols: cols.reverse(), pitch: pp, edge:{first:addR, last:addL}};   // 뒤집었으므로 오른쪽 끝이 첫 행
 };
 
+// ---------- 필사본용 휜 행 경계 ----------
+// seams(): segment()가 찾은 곧은 경계를 출발점으로, 먹을 덜 지나는 휜 경계(위→아래, 한 칸씩만 옆으로)를
+// 동적 계획법으로 찾는다. 결과는 경계 x마다 [t, bt) 각 줄의 x 위치. Python seg.py의 seams()와 같다.
+KP.seams = function(im, seg){
+  const {w:W, h:Hh} = im, t=seg.t, bt=seg.bt, Hb=bt-t; if (Hb<2) return {};
+  const b = binar(im), vl = open1d(b, W, Hh, Math.floor(Hh/4), true);
+  // 세로 줄(광곽·계선)을 뺀 먹을 가우스(σ 2.5)로 흐리게
+  const R=8, ker=[]; let ks=0; for (let i=-R;i<=R;i++){ const v=Math.exp(-i*i/(2*2.5*2.5)); ker.push(v); ks+=v; } for (let i=0;i<ker.length;i++) ker[i]/=ks;
+  const raw=new Float32Array(W*Hb); for (let y=0;y<Hb;y++) for (let x=0;x<W;x++){ const i=(t+y)*W+x; raw[y*W+x]=b[i]&(1-vl[i]); }
+  const tmp=new Float32Array(W*Hb), ink=new Float32Array(W*Hb);
+  for (let y=0;y<Hb;y++) for (let x=0;x<W;x++){ let s=0; for (let k=-R;k<=R;k++){ let xx=x+k; xx=xx<0?-xx-1:xx>=W?2*W-xx-1:xx; xx=Math.min(W-1,Math.max(0,xx)); s+=raw[y*W+xx]*ker[k+R]; } tmp[y*W+x]=s; }
+  for (let y=0;y<Hb;y++) for (let x=0;x<W;x++){ let s=0; for (let k=-R;k<=R;k++){ let yy=y+k; yy=yy<0?-yy-1:yy>=Hb?2*Hb-yy-1:yy; yy=Math.min(Hb-1,Math.max(0,yy)); s+=tmp[yy*W+x]*ker[k+R]; } ink[y*W+x]=s; }
+  const xs=[...new Set(seg.cols.flat())].sort((a,c)=>a-c);
+  const pitch = seg.pitch || 80, paths={};
+  xs.forEach((x,i)=>{
+    const lo=Math.trunc(Math.max(0, x-0.4*pitch, i?(xs[i-1]+x)/2+1:0)), hi=Math.trunc(Math.min(W-1, x+0.4*pitch, i+1<xs.length?(xs[i+1]+x)/2-1:W-1));
+    const n=hi-lo+1; if (n<1){ paths[x]=new Int32Array(Hb).fill(x); return; }
+    let D=new Float64Array(n); for (let j=0;j<n;j++) D[j]=ink[lo+j]+0.002*Math.abs(lo+j-x);
+    const P=new Int8Array(Hb*n);
+    for (let y=1;y<Hb;y++){
+      const N=new Float64Array(n);
+      for (let j=0;j<n;j++){
+        let best=D[j], k=0;
+        if (j>0 && D[j-1]+0.03<best){ best=D[j-1]+0.03; k=-1; }
+        if (j+1<n && D[j+1]+0.03<best){ best=D[j+1]+0.03; k=1; }
+        N[j]=best+ink[y*W+lo+j]; P[y*n+j]=k;
+      }
+      D=N;
+    }
+    let j=0; for (let k=1;k<n;k++) if (D[k]<D[j]) j=k;
+    const path=new Int32Array(Hb);
+    for (let y=Hb-1;y>=0;y--){ path[y]=j+lo; j+=P[y*n+j]; }
+    paths[x]=path;
+  });
+  return paths;
+};
+// 휜 두 경계 사이를 잘라, 행 가운데가 곧게 서도록 줄마다 옮겨 붙인 뒤(경계 밖은 흰색) 판독용으로 만든다
+KP.prepLineCurved = function(im, L, R, t, bt){
+  const Hb=L.length, pad=3, c=new Float64Array(Hb); for (let y=0;y<Hb;y++) c[y]=(L[y]+R[y])/2;
+  const k=Math.max(31, Math.trunc(Hb/8)|1), h2=k>>1, cs=new Float64Array(Hb);
+  for (let y=0;y<Hb;y++){ let s=0; for (let i=y-h2;i<=y+h2;i++) s+=c[Math.min(Hb-1,Math.max(0,i))]; cs[y]=s/k; }
+  let half=0; for (let y=0;y<Hb;y++) half=Math.max(half, cs[y]-L[y], R[y]-cs[y]); half=Math.trunc(half)+pad;
+  const w=2*half+1, out=new Uint8Array(w*Hb).fill(255);
+  for (let y=0;y<Hb;y++){
+    const x0=Math.round(cs[y])-half, l=Math.max(L[y]-pad,0), r=Math.min(R[y]+pad,im.w-1), xa=Math.max(x0,l), xb=Math.min(x0+w-1,r);
+    for (let x=xa;x<=xb;x++) out[y*w+x-x0]=im.d[(t+y)*im.w+x];
+  }
+  let rr = cropRot({w, h:Hb, d:out}, 0, 0, w, Hb);
+  rr = autocontrast(rr);
+  const nw = Math.min(MAXW, Math.max(32, Math.trunc(rr.w*H/rr.h)));
+  rr = resizeBilinear(rr, nw, H);
+  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-rr.d[i]/255;
+  return {data:f, w:nw};
+};
+
 // 한 행 잘라 90도 돌리고 autocontrast(1%) → 높이 64로 줄이기 (PIL 방식 그대로)
 function cropRot(im, x0, y0, x1, y1){ // PIL crop: 바깥은 0
   const w0=x1-x0, h0=y1-y0, out=new Uint8Array(w0*h0); // 돌린 그림: 너비 h0, 높이 w0

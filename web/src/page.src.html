@@ -78,6 +78,12 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .field{display:grid;gap:4px;font-size:.8rem;color:var(--muted)}
 .field input[type=number]{width:84px;font:500 .95rem var(--f-mono);padding:7px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--ink)}
 .check{display:flex;align-items:center;gap:8px;font-size:.9rem;min-height:38px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--bg)}
+.seg label{display:flex;align-items:center;cursor:pointer;font-size:.9rem;color:var(--ink);padding:0}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label span,.seg label{padding:8px 12px;min-height:22px}
+.seg label:has(input:checked){background:var(--ink);color:var(--bg)}
+.seg label+label{border-left:1px solid var(--line)}
 .check input{width:18px;height:18px;accent-color:var(--accent)}
 .status{grid-column:1/-1;display:grid;gap:6px}
 .status .msg{font-size:.88rem;color:var(--muted);min-height:1.4em}
@@ -220,6 +226,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       </span>
     </label>
     <div class="opts">
+      <span class="field kind">판본<span class="seg"><label><input type="radio" name="kind" value="bang" checked>방각본</label><label><input type="radio" name="kind" value="pilsa">필사본</label></span></span>
       <label class="field">시작 쪽<input type="number" id="p0" min="1" value="1"></label>
       <label class="field">끝 쪽 (0 = 끝까지)<input type="number" id="p1" min="0" value="0"></label>
       <label class="check lmonly"><input type="checkbox" id="lm" checked>언어 모델 보정</label>
@@ -314,15 +321,20 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 </script>
 <script>
 const CFG = {
-  model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], modelLabel: '10차 모델',
-  lm: 'lm7.gz.wasm', spacer: 'spacer.wasm', spacerVocab: 'spacer_vocab.json', charset: 'charset_v10.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
+  model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], modelLabel: '10차 모델', charset: 'charset_v10.json',
+  // 필사본을 고르면 이 모델과 휜 행 나누기를 쓴다
+  pilsa: {model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], modelLabel: '10차 모델(필사본)', charset: 'charset_v10.json'},
+  lm: 'lm7.gz.wasm', spacer: 'spacer.wasm', spacerVocab: 'spacer_vocab.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
   approxMB: 47, github: false, minConf: 0.85, lineConf: 0.97, inbox: '', issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
 const SAMPLE = /*SAMPLE*/;
 const $ = (id)=>document.getElementById(id);
-const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, lmReady:null };
+const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, engs:{}, lmReady:null, kind:'bang' };
+const runLabel = ()=> (state.runKind==='pilsa' ? CFG.pilsa : CFG).modelLabel;
+const kindCfg = ()=> state.kind==='pilsa' ? CFG.pilsa : CFG;
+document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener('change',()=>{ state.kind=r.value; if (r.checked && r.value==='pilsa') $('lm').checked=false; else if (r.checked && CFG.lm) $('lm').checked=true; }));
 
 // ---------- 엔진 내려받기 ----------
 async function fetchBytes(url, onBytes){
@@ -332,14 +344,16 @@ async function fetchBytes(url, onBytes){
   const out = new Uint8Array(n); let o=0; for (const c of chunks){ out.set(c,o); o+=c.length; } return out;
 }
 async function loadEngine(needLM){
+  const K=kindCfg(), key=K.model.join(',');
+  state.eng = state.engs[key] || null;
   if (!state.eng){
     let got=0; const tick=(n)=>{ got+=n; setMsg(`판독 엔진 내려받는 중 ${(got/1e6).toFixed(0)} / 약 ${CFG.approxMB}MB (처음 한 번만)`); setBar(got/(CFG.approxMB*1e6)); };
     ort.env.wasm.wasmPaths='./'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
-    const parts = await Promise.all(CFG.model.map(u=>fetchBytes(u,tick)));
+    const parts = await Promise.all(K.model.map(u=>fetchBytes(u,tick)));
     const buf = new Uint8Array(parts.reduce((a,b)=>a+b.length,0)); let o=0; for (const p of parts){ buf.set(p,o); o+=p.length; }
-    const cs = (await (await fetch(CFG.charset)).json()).chars;
+    const cs = (await (await fetch(K.charset)).json()).chars;
     setMsg('판독 엔진 준비 중…');
-    state.eng = await makeRunners(buf, cs);
+    state.eng = state.engs[key] = await makeRunners(buf, cs);
   }
   if (needLM && !state.eng.LM){
     setMsg('언어 모델 준비 중…');
@@ -449,9 +463,19 @@ function previewURL(g){ // 화면용 축소 사진
 const median = (a)=>{ const s=[...a].sort((x,y)=>x-y); return s.length? s[s.length>>1] : 0; };
 // 이용 통계(GoatCounter, 쿠키 없음): 버튼을 누른 횟수만 센다
 function gc(name){ try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({path:'event/'+name, title:name, event:true}); } catch(e){} }
-async function run(){ gc('판독');
+// 행 그림 만들기: 필사본이면 휜 경계를 따라 자른다(경계는 면마다 한 번 계산해 seg에 둔다)
+function prepCol(g, seg, k){
+  const [x0,x1]=seg.cols[k];
+  if (state.runKind==='pilsa'){
+    if (!seg.paths){ try { seg.paths=KP.seams(g,seg); } catch(e){ seg.paths={}; } }
+    const L=seg.paths[x0], R=seg.paths[x1];
+    if (L && R) return KP.prepLineCurved(g,L,R,seg.t,seg.bt);
+  }
+  return KP.prepLine(g,x0,x1,seg.t,seg.bt);
+}
+async function run(){ gc('판독'+(state.kind==='pilsa'?'_필사본':''));
   if (!state.file || state.running) return;
-  const useLM = $('lm').checked;
+  const useLM = $('lm').checked; state.runKind = state.kind;
   state.running=true; state.stop=false; $('go').disabled=true; $('stop').hidden=false;
   const prevPages = state.pages, prevName = state.name;
   try {
@@ -481,7 +505,7 @@ async function run(){ gc('판독');
         // 행 그림을 만들어 여러 판독기(워커)에 나눠 맡긴다. 처음 6행을 먼저 읽어 표지·빈 면이면 그만 읽는다
         let n=seg.cols.length, res=new Array(n); let got=0;
         const one=async(k)=>{
-          const [x0,x1]=seg.cols[k]; const p=KP.prepLine(g,x0,x1,seg.t,seg.bt);
+          const p=prepCol(g,seg,k);
           const tl=performance.now(); const {y,T,C}=await eng.run(p.data,p.w); lineMs.push((performance.now()-tl)/eng.par);
           const lp=KP.logSoftmax(y,T,C); const text = useLM ? KP.beam(lp,T,C,eng.cs,eng.LM) : KP.greedy(lp,T,C,eng.cs);
           let sm=0, nn=0; for (let t=0;t<T;t++){ let m=-Infinity, kk=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; kk=c; } if (kk){ sm+=Math.exp(m); nn++; } }
@@ -503,7 +527,7 @@ async function run(){ gc('판독');
           if (sm.cols.length>=6){
             const cs=[];
             for (const k of [...Array(Math.min(6,sm.cols.length)).keys()]){
-              const [x0,x1]=sm.cols[k]; const p=KP.prepLine(gm,x0,x1,sm.t,sm.bt); const {y,T,C}=await eng.run(p.data,p.w); const lp=KP.logSoftmax(y,T,C);
+              const p=prepCol(gm,sm,k); const {y,T,C}=await eng.run(p.data,p.w); const lp=KP.logSoftmax(y,T,C);
               let s2=0, n2=0; for (let t=0;t<T;t++){ let m=-Infinity, kk=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; kk=c; } if (kk){ s2+=Math.exp(m); n2++; } }
               cs.push(n2?s2/n2:0);
             }
@@ -836,7 +860,7 @@ function pageText(P){ return `## ${plab(P)}\n` + (P.status==='empty' ? '(본문 
 function allText(){
   const d=new Date(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const n = state.pages.reduce((a,p)=>a+p.lines.filter(lchg).length,0);
-  return `# ${state.name} 자동 판독 (방각본 고전소설 판독기 ${CFG.modelLabel}${state.useLM?' + 언어 모델 보정':''})\n# 오른쪽 행부터 차례로, 한 줄 = 판본 한 행\n# 판독일 ${ds}${n?`, 사람이 고친 행 ${n}개`:''}\n\n` + state.pages.map(pageText).join('\n');
+  return `# ${state.name} 자동 판독 (방각본 고전소설 판독기 ${runLabel()}${state.useLM?' + 언어 모델 보정':''})\n# 오른쪽 행부터 차례로, 한 줄 = 판본 한 행\n# 판독일 ${ds}${n?`, 사람이 고친 행 ${n}개`:''}\n\n` + state.pages.map(pageText).join('\n');
 }
 async function copyText(t, okMsg){
   try { await navigator.clipboard.writeText(t); setMsg(okMsg); }
@@ -905,7 +929,7 @@ async function sendInbox(P){
   const btn=$('sendTrain'); btn.disabled=true; setMsg(`${plab(P)}을 학습용으로 보내는 중…`);
   try {
     const doc={src:state.name, commons:state.commons||'', page:P.no, side:P.side||'', W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
-      lines:trainLines(P), note:(P.note||'').slice(0,2000), model:CFG.modelLabel, lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
+      lines:trainLines(P), note:(P.note||'').slice(0,2000), model:runLabel(), lm:!!state.useLM, by:$('trainBy').value.trim().slice(0,40), at:new Date().toISOString(), from:location.host};
     const body=JSON.stringify(Object.assign({image: await b64(P.full)}, doc));
     const r=await fetch(CFG.inbox,{method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body});
     const j=await r.json();
@@ -922,7 +946,7 @@ async function sendInbox(P){
 function reportIssue(){
   const t=$('reportText').value.trim(); if (!t){ $('reportText').focus(); return; }
   const P=state.pages[state.cur];
-  const env=[`판독기: ${location.host||'연구팀용'} / ${CFG.modelLabel}`, `브라우저: ${navigator.userAgent}`, `화면: ${innerWidth}×${innerHeight}`, state.name?`보던 자료: ${state.name}${P?' '+P.no+'쪽':''}${state.commons?' (위키미디어 공용 '+state.commons+')':''}`:''].filter(Boolean).join('\n');
+  const env=[`판독기: ${location.host||'연구팀용'} / ${runLabel()}`, `브라우저: ${navigator.userAgent}`, `화면: ${innerWidth}×${innerHeight}`, state.name?`보던 자료: ${state.name}${P?' '+P.no+'쪽':''}${state.commons?' (위키미디어 공용 '+state.commons+')':''}`:''].filter(Boolean).join('\n');
   const title='[문제] '+t.split('\n')[0].slice(0,60);
   window.open(CFG.issues+'?'+new URLSearchParams({template:'problem.yml',title,what:t,env}).toString(),'_blank','noopener');
 }
@@ -940,7 +964,7 @@ async function sendTrain(){
     if (!image){ const r=await ASSETS.upload(P.full,{type:'image/jpeg'}); image=r.id; }
     P.imageId=image;
     const doc={src:state.name, page:P.no, side:P.side||'', W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols.map(c=>({a:c[0],c:c[1]})),
-      lines:trainLines(P), note:(P.note||'').slice(0,2000), image, model:CFG.modelLabel, lm:!!state.useLM, by:UID, at:new Date().toISOString()};
+      lines:trainLines(P), note:(P.note||'').slice(0,2000), image, model:runLabel(), lm:!!state.useLM, by:UID, at:new Date().toISOString()};
     await DB.collection('training').doc(key).set(doc);
     SENT.set(key, doc); renderPages();
     gc('학습용보내기'); setMsg(`${plab(P)}을 학습용으로 보냈습니다. 고친 행 ${doc.lines.filter(l=>l.removed||l.added||l.text!==l.orig).length}개.`);
@@ -968,7 +992,7 @@ $('copyAll').onclick=()=>copyText(allText(), '전체 판독문을 복사했습�
 function snapshot(){
   const pages=state.pages.filter(P=>!P.sample).map(P=>({no:P.no, side:P.side||'', split:P.split||null, srcW:P.srcW||P.W, W:P.W, H:P.H, t:P.t, bt:P.bt, cols:P.cols,
     lines:P.lines.map(l=>{ const o={text:l.text, orig:l.orig}; if (l.removed) o.removed=true; if (l.added) o.added=true; return o; }), conf:P.conf||[], status:P.status, note:P.note||'', reveal:!!P.reveal, flipped:!!P.flipped}));
-  return {format:'bangakbon-ocr', version:1, src:state.name, model:CFG.modelLabel, made:new Date().toISOString(), fileKey:state.fileKey, pages};
+  return {format:'bangakbon-ocr', version:1, src:state.name, model:runLabel(), made:new Date().toISOString(), fileKey:state.fileKey, pages};
 }
 const IDB={ db:null,
   open(){ return this.db || (this.db=new Promise((res,rej)=>{ try { const r=indexedDB.open('bangakbon',1); r.onupgradeneeded=()=>r.result.createObjectStore('books'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); } catch(e){ rej(e); } })); },

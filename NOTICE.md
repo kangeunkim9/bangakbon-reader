@@ -19,4 +19,5 @@ MIT 라이선스입니다(`LICENSE`). 저작권 표시를 남기면 누구나 �
 
 ## 4. 함께 쓰는 프로그램
 - ONNX Runtime Web (Microsoft, MIT 라이선스): 브라우저에서 모델을 실행합니다. jsDelivr에서 불러옵니다.
+- NDLOCR-Lite (일본 국립국회도서관, CC BY 4.0): 필사본 행 찾기에 레이아웃 모델(DEIMv2)을 그대로 씁니다(`web/ndl_layout_*.wasm`). 이 모델에는 Meta의 DINOv3 라이선스도 함께 적용됩니다. 원문 라이선스는 `web/licenses/`에 있습니다.
 - GoatCounter: 쿠키 없는 익명 이용 통계.

@@ -22,7 +22,8 @@ jobs:
       - name: 웹 파일만 모으기
         run: |
           mkdir _site
-          cp web/index.html web/contributors.html web/sample.jpg web/charset_v*.json web/model_v*_*.wasm web/ort-wasm-simd.wasm web/lm7.gz.wasm web/spacer.wasm web/spacer_vocab.json _site/
+          cp web/index.html web/contributors.html web/sample.jpg web/charset_v*.json web/model_v*_*.wasm web/ort-wasm-simd.wasm web/lm7.gz.wasm web/spacer.wasm web/spacer_vocab.json web/ndl_layout_*.wasm _site/
+          cp -r web/licenses _site/
           if [ -d web/pre ]; then cp -r web/pre _site/; fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

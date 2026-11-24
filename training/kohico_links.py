@@ -9,9 +9,7 @@ out = []
 for yr in ('2023', '2024', '2025'):
     try:
         r = requests.get(API, params={'keyVal': userdata.get(f'KOHICO_KEY_{yr}')}, timeout=60)
-        url = r.json() if r.headers.get('content-type', '').startswith('application/json') else r.text
-        if isinstance(url, dict): url = next((v for v in url.values() if isinstance(v, str) and v.startswith('http')), '')
-        url = str(url).strip().strip('"')
+        url = r.text.strip().strip('"')   # 응답은 주소 한 줄(따옴표 없는 글자)
         out.append(f'<p><a href="{html.escape(url)}" target="_blank" style="font-size:16px">국어 역사 자료 말뭉치 {yr} 내려받기 화면 열기</a></p>' if url.startswith('http') else f'<p>{yr}: 주소를 못 받음</p>')
     except Exception as e:
         out.append(f'<p>{yr}: 오류 {type(e).__name__}</p>')

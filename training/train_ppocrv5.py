@@ -50,7 +50,7 @@ open(D + '/val.txt', 'w', encoding='utf-8').write('\n'.join(L_v) + '\n')
 print('학습 목록', len(TR), '행', flush=True)
 
 # ---------------- 2) 설정: PP-OCRv5 server 인식 모델 + 중국어 등 학습 가중치에서 출발 ----------------
-BS = 64; EP = 2
+BS = 32; EP = 2
 cfg = yaml.safe_load(open(PP + '/configs/rec/PP-OCRv5/PP-OCRv5_server_rec.yml'))
 OUT = ROOT + '/ppocrv5_out'
 cfg['Global'].update(epoch_num=EP, use_gpu=True, distributed=False, character_dict_path=D + '/dict.txt', max_text_length=MAXL,
@@ -70,6 +70,9 @@ cfg['Eval']['loader'].update(batch_size_per_card=64, num_workers=2)
 yaml.safe_dump(cfg, open(D + '/cfg.yml', 'w'), allow_unicode=True)
 
 # ---------------- 3) 학습 (PaddleOCR 공식 도구, 끊기면 latest에서 이어서) ----------------
+import gc
+for _k in ('sysm', 'svm', 'm10', 'R10', 'opt'): globals().pop(_k, None)   # 앞 셀이 남긴 GPU 메모리 비우기
+gc.collect(); torch.cuda.empty_cache()
 resume = ['-o', f'Global.checkpoints={OUT}/latest'] if os.path.exists(OUT + '/latest.pdparams') else []
 p = subprocess.Popen([sys.executable, 'tools/train.py', '-c', D + '/cfg.yml'] + resume, cwd=PP, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 for line in p.stdout:

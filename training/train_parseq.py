@@ -72,7 +72,7 @@ def prep_p(src, aug=False):
             g = random.uniform(0.6, 1.6); im = im.point(lambda v: int(255 * ((v / 255) ** g)))
     a = np.asarray(im.resize((IMG[1], IMG[0]), Image.BICUBIC), dtype=np.float32) / 127.5 - 1.0
     if aug: a = np.clip(a + np.random.normal(0, 0.06, a.shape), -1, 1)
-    return torch.from_numpy(np.repeat(a[None], 3, 0))
+    return torch.from_numpy(np.repeat(a[None], 3, 0).astype(np.float32))
 class DSP(torch.utils.data.Dataset):
     def __init__(s, pairs, aug): s.p = pairs; s.aug = aug
     def __len__(s): return len(s.p)

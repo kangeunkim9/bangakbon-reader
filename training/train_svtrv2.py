@@ -20,6 +20,14 @@ for _k in ('sysm', 'm10', 'R10', 'opt', 'svm'): globals().pop(_k, None)   # 앞 
 gc.collect(); torch.cuda.empty_cache()
 warnings.filterwarnings('ignore')
 from openrec.modeling import build_model
+import torch.nn.functional as F
+import openrec.modeling.encoders.svtrv2_lnconv_two33 as _sv2
+def _attn_fwd(self, x):          # 긴 행에서 메모리가 넘치지 않게 원래 어텐션을 같은 계산의 메모리 절약판으로 바꾼다
+    B, N, _ = x.shape
+    q, k, v = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4).unbind(0)
+    x = F.scaled_dot_product_attention(q, k, v, dropout_p=self.attn_drop.p if self.training else 0.0, scale=self.scale)
+    return self.proj_drop(self.proj(x.transpose(1, 2).reshape(B, N, self.dim)))
+_sv2.Attention.forward = _attn_fwd
 AMP = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 scaler = torch.cuda.amp.GradScaler(enabled=(AMP == torch.float16))
 
@@ -104,7 +112,7 @@ def val_s(m):
     return cer(read_s(m, [p for p, _ in KVA]), [t for _, t in KVA]), cer(read_s(m, [p for p, _ in PSV]), [t for _, t in PSV])
 
 # ---------------- 4) 학습 (에폭마다 드라이브에 저장, 끊기면 이어서) ----------------
-EP = 8; NAH = min(len(AHtr), 25000); BS = 16; REP_IN = 3
+EP = 8; NAH = min(len(AHtr), 25000); BS = 24; REP_IN = 3
 per = len(KTR) + REP_IN * len(INTR) + NAH + len(PS_tr); steps = EP * (per // BS)
 pg = [{'params': [p for n, p in svm.named_parameters() if n in NEW], 'lr': 1e-3},
       {'params': [p for n, p in svm.named_parameters() if n not in NEW], 'lr': 2e-4}]

@@ -15,7 +15,9 @@ src10 = requests.get(RAW + 'train_v10.py', timeout=60).text
 exec(src10[:src10.index('# ---------------- 4)')], globals())     # 10차와 같은 학습 자료
 exec(src10[src10.index('# ---------------- 4)'):src10.index('def prep9')], globals())   # lowres
 
-import math, warnings, yaml
+import math, warnings, yaml, gc
+for _k in ('sysm', 'm10', 'R10', 'opt', 'svm'): globals().pop(_k, None)   # 앞 셀(PARSeq)이 남긴 GPU 메모리 비우기
+gc.collect(); torch.cuda.empty_cache()
 warnings.filterwarnings('ignore')
 from openrec.modeling import build_model
 AMP = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -48,7 +50,7 @@ NEW = {'decoder.fc.weight', 'decoder.fc.bias'}
 print('중국어 SVTRv2 가중치', keep, '개 가져옴 / 새로 배울 것: 출력층', '/ 파라미터', round(sum(p.numel() for p in svm.parameters()) / 1e6, 2), 'M', flush=True)
 
 # ---------------- 3) 전처리: 10차와 같은 덧붙임, 높이 48, 너비는 비율대로(32의 배수), -1~1 ----------------
-SH = 48; SMAXW = 1600
+SH = 48; SMAXW = 1280
 def prep_s(src, aug=False):
     im = (Image.open(src) if isinstance(src, str) else src).convert('L').rotate(90, expand=True)
     im = ImageOps.autocontrast(im, cutoff=1)
@@ -102,7 +104,7 @@ def val_s(m):
     return cer(read_s(m, [p for p, _ in KVA]), [t for _, t in KVA]), cer(read_s(m, [p for p, _ in PSV]), [t for _, t in PSV])
 
 # ---------------- 4) 학습 (에폭마다 드라이브에 저장, 끊기면 이어서) ----------------
-EP = 8; NAH = min(len(AHtr), 25000); BS = 32; REP_IN = 3
+EP = 8; NAH = min(len(AHtr), 25000); BS = 16; REP_IN = 3
 per = len(KTR) + REP_IN * len(INTR) + NAH + len(PS_tr); steps = EP * (per // BS)
 pg = [{'params': [p for n, p in svm.named_parameters() if n in NEW], 'lr': 1e-3},
       {'params': [p for n, p in svm.named_parameters() if n not in NEW], 'lr': 2e-4}]

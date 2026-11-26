@@ -54,6 +54,10 @@ own = svm.state_dict(); keep = 0
 for k, v in sd.items():
     if k in own and own[k].shape == v.shape: own[k] = v; keep += 1
 svm.load_state_dict(own); svm = svm.to(DEV)
+# 셀에서 SV_TAG='v2'; SV_EP=16; SV_INIT=ROOT+'/svtrv2_model_v1.pt' 처럼 주면 앞 결과에서 이어 더 길게 배운다
+SV_TAG = globals().get('SV_TAG', 'v1'); SV_EP = globals().get('SV_EP', 8); SV_INIT = globals().get('SV_INIT')
+if SV_INIT:
+    svm.load_state_dict(torch.load(SV_INIT, map_location=DEV, weights_only=False)['state']); print('이어서 출발:', SV_INIT, flush=True)
 NEW = {'decoder.fc.weight', 'decoder.fc.bias'}
 print('중국어 SVTRv2 가중치', keep, '개 가져옴 / 새로 배울 것: 출력층', '/ 파라미터', round(sum(p.numel() for p in svm.parameters()) / 1e6, 2), 'M', flush=True)
 
@@ -112,14 +116,14 @@ def val_s(m):
     return cer(read_s(m, [p for p, _ in KVA]), [t for _, t in KVA]), cer(read_s(m, [p for p, _ in PSV]), [t for _, t in PSV])
 
 # ---------------- 4) 학습 (에폭마다 드라이브에 저장, 끊기면 이어서) ----------------
-EP = 8; NAH = min(len(AHtr), 25000); BS = 24; REP_IN = 3
+EP = SV_EP; NAH = min(len(AHtr), 25000); BS = 24; REP_IN = 3
 per = len(KTR) + REP_IN * len(INTR) + NAH + len(PS_tr); steps = EP * (per // BS)
 pg = [{'params': [p for n, p in svm.named_parameters() if n in NEW], 'lr': 1e-3},
       {'params': [p for n, p in svm.named_parameters() if n not in NEW], 'lr': 2e-4}]
 opt = torch.optim.AdamW(pg, weight_decay=0.05)
 sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=[1e-3, 2e-4], total_steps=steps, pct_start=0.05)
 ctc = nn.CTCLoss(blank=0, zero_infinity=True)
-CKP = ROOT + '/ckpt_svtrv2.pt'; SAVES = ROOT + '/svtrv2_model_v1.pt'; ep0 = 1; best = None; logs = []
+CKP = ROOT + f'/ckpt_svtrv2_{SV_TAG}.pt' if SV_TAG != 'v1' else ROOT + '/ckpt_svtrv2.pt'; SAVES = ROOT + f'/svtrv2_model_{SV_TAG}.pt'; ep0 = 1; best = None; logs = []
 if os.path.exists(CKP):
     c0 = torch.load(CKP, map_location=DEV, weights_only=False)
     if c0.get('per') == per and c0.get('chars') == CH:
@@ -184,4 +188,4 @@ print(f"\n[금향졍긔 뒤쪽 절반]  10차 {R['geum_v10']*100:.2f}%  SVTRv2 {
 print(f"[경판 검증]          10차 {R['val_v10']*100:.2f}%  SVTRv2 {R['val_s']*100:.2f}%")
 print(f"[필사본 시험 행]      10차 {R['pilsa_v10']*100:.2f}%  SVTRv2 {R['pilsa_s']*100:.2f}%")
 print(f"[AI허브 심청전_04]   10차 {R['simcheong_v10']*100:.2f}%  SVTRv2 {R['simcheong_s']*100:.2f}%")
-json.dump({'result': R, 'log': logs}, open(ROOT + '/result_svtrv2_v1.json', 'w'), ensure_ascii=False)
+json.dump({'result': R, 'log': logs}, open(ROOT + f'/result_svtrv2_{SV_TAG}.json', 'w'), ensure_ascii=False)

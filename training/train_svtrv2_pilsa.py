@@ -42,7 +42,8 @@ else:
     class _R(torch.utils.data.Dataset):
         def __len__(s): return len(ALL)
         def __getitem__(s, i): return prep_s(ALL[i][0]), i
-    dl = torch.utils.data.DataLoader(_R(), batch_size=64, num_workers=4, collate_fn=lambda b: (batch_s([a for a, _ in b]), [i for _, i in b]))
+    FBS = 64 if torch.cuda.get_device_properties(0).total_memory > 20e9 else 16; gc.collect(); torch.cuda.empty_cache()
+    dl = torch.utils.data.DataLoader(_R(), batch_size=FBS, num_workers=4, collate_fn=lambda b: (batch_s([a for a, _ in b]), [i for _, i in b]))
     keep = []; svm.eval(); t0 = time.time(); bad = collections.Counter(); seen = collections.Counter()
     with torch.no_grad():
         for k, (x, ii) in enumerate(dl):
@@ -52,7 +53,7 @@ else:
                 g = graphemes(ALL[i][1]); e = lev(graphemes(p), g) / max(1, len(g)); seen[ALL[i][2]] += 1
                 if e <= 0.35: keep.append(i)
                 else: bad[ALL[i][2]] += 1
-            if k % 500 == 0: print(f'  점검 {k*64}/{len(ALL)}행 {time.time()-t0:.0f}s', flush=True)
+            if k % 2000 == 0: print(f'  점검 {k*FBS}/{len(ALL)}행 {time.time()-t0:.0f}s', flush=True)
     json.dump(keep, open(FILT, 'w'))
     print('정답 점검으로 뺀 비율이 높은 책:', sorted(((bad[b] / seen[b], seen[b], b) for b in seen if seen[b] >= 50), reverse=True)[:10], flush=True)
 PALL = [(ALL[i][0], ALL[i][1]) for i in sorted(keep)]

@@ -214,11 +214,7 @@ KP.prepLineCurved = function(im, L, R, t, bt){
     for (let x=xa;x<=xb;x++) out[y*w+x-x0]=im.d[(t+y)*im.w+x];
   }
   let rr = cropRot({w, h:Hb, d:out}, 0, 0, w, Hb);
-  rr = autocontrast(rr);
-  const nw = Math.min(MAXW, Math.max(32, Math.trunc(rr.w*H/rr.h)));
-  rr = resizeBilinear(rr, nw, H);
-  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-rr.d[i]/255;
-  return {data:f, w:nw};
+  return toInput(autocontrast(rr));
 };
 
 // 한 행 잘라 90도 돌리고 autocontrast(1%) → 높이 64로 줄이기 (PIL 방식 그대로)
@@ -281,12 +277,24 @@ function resizeBilinear(im, ow, oh){ // Pillow ImagingResample, 8비트: 가로 
 }
 KP.prepLine = function(im, a, c, t, bt){
   let r = cropRot(im, Math.max(0,a-3), t, c+3, bt);
-  r = autocontrast(r);
-  const nw = Math.min(MAXW, Math.max(32, Math.trunc(r.w*H/r.h)));
-  r = resizeBilinear(r, nw, H);
-  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-r.d[i]/255;
-  return {data:f, w:nw};
+  return toInput(autocontrast(r));
 };
+// 판독 모델마다 받는 행 그림 꼴이 다르다.
+//  crnn(10차까지): 높이 64, 1채널, 먹=1 바탕=0, 너비 그대로(최대 1600)
+//  svtr(SVTRv2): 높이 48, 3채널, -1~1(바탕=+1), 너비 최대 1280을 32의 배수로 채움(흰 바탕)
+KP.FMT = 'crnn';
+function toInput(r){
+  if (KP.FMT==='svtr'){
+    const SH=48, nw=Math.min(1280, Math.max(64, Math.trunc(r.w*SH/r.h)));
+    const z=resizeBilinear(r, nw, SH), W=Math.ceil(nw/32)*32, f=new Float32Array(3*SH*W).fill(1);
+    for (let y=0;y<SH;y++) for (let x=0;x<nw;x++){ const v=z.d[y*nw+x]/127.5-1; f[y*W+x]=v; f[SH*W+y*W+x]=v; f[2*SH*W+y*W+x]=v; }
+    return {data:f, w:W, shape:[1,3,SH,W]};
+  }
+  const nw = Math.min(MAXW, Math.max(32, Math.trunc(r.w*H/r.h)));
+  const z = resizeBilinear(r, nw, H);
+  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-z.d[i]/255;
+  return {data:f, w:nw, shape:[1,1,H,nw]};
+}
 
 // ---------- 디코딩 ----------
 KP.logSoftmax = function(y, T, C){

@@ -217,6 +217,64 @@ KP.prepLineCurved = function(im, L, R, t, bt){
   return toInput(autocontrast(rr));
 };
 
+// ---------- 필사본: 행 찾기 상자 다듬기와 기운 행 오리기 (seg.py의 clean_boxes·crop_skew와 같다) ----------
+// cleanBoxes(): 가로로 누운 상자(로고·쪽번호)와 아주 작은 상자(행 사이에 덧쓴 글자·표시)는 빼고,
+// 같은 행을 두 번 잡은 상자는 하나로 합친다. 상자는 [x0,y0,x1,y1], 결과는 오른쪽 행부터.
+KP.cleanBoxes = function(bs, W, H){
+  bs = bs.filter(b=>(b[3]-b[1])>=(b[2]-b[0])).map(b=>b.map(v=>Math.trunc(v)));
+  if (!bs.length) return [];
+  const hs = bs.map(b=>b[3]-b[1]).sort((a,c)=>a-c), n=hs.length, mh = n%2 ? hs[(n-1)/2] : (hs[n/2-1]+hs[n/2])/2;
+  bs = bs.filter(b=>b[3]-b[1] >= 0.15*mh).sort((p,q)=>(q[3]-q[1])-(p[3]-p[1]));
+  const out=[];
+  for (const b of bs){
+    let merged=false;
+    for (const o of out){
+      const ov=Math.min(b[2],o[2])-Math.max(b[0],o[0]), mw=Math.min(b[2]-b[0],o[2]-o[0]), yo=Math.min(b[3],o[3])-Math.max(b[1],o[1]);
+      if (ov>0.5*mw && (yo>0.3*(b[3]-b[1]) || -yo<0.02*H)){ o[0]=Math.min(o[0],b[0]); o[1]=Math.min(o[1],b[1]); o[2]=Math.max(o[2],b[2]); o[3]=Math.max(o[3],b[3]); merged=true; break; }
+    }
+    if (!merged) out.push(b.slice());
+  }
+  return out.sort((p,q)=>q[0]-p[0]);
+};
+function pctl(arr, q){ // numpy percentile(linear)
+  const a=Float64Array.from(arr).sort(), n=a.length; if (!n) return 0;
+  const pos=(n-1)*q/100, i=Math.floor(pos), f=pos-i; return i+1<n ? a[i]+(a[i+1]-a[i])*f : a[i];
+}
+function wfit(ys, xs, w, keep){
+  let sw=0, sy=0, sx=0; for (let i=0;i<w.length;i++) if (!keep||keep[i]){ sw+=w[i]; sy+=ys[i]*w[i]; sx+=xs[i]*w[i]; }
+  if (sw<=0) return null; const ym=sy/sw, xm=sx/sw; let v=0, c=0;
+  for (let i=0;i<w.length;i++) if (!keep||keep[i]){ const dy=ys[i]-ym; v+=dy*dy*w[i]; c+=dy*(xs[i]-xm)*w[i]; }
+  const b = v>0 ? c/v : 0; return [xm, ym, Math.max(-0.25, Math.min(0.25, b))];
+}
+// prepLineSkew(): 상자 안 먹으로 행 가운데 줄(x = xm + s·(y−ym))을 재고, 그 줄을 따라 같은 폭으로 오려 곧게 세운다.
+// 거의 곧은 행이면 null(원래대로 상자째 자른다).
+KP.skewStrip = function(im, box){
+  const [x0,y0,x1,y1]=box, bw=x1-x0, h=y1-y0; if (bw<4 || h<4) return null;
+  const sub=new Float64Array(bw*h); for (let y=0;y<h;y++) for (let x=0;x<bw;x++) sub[y*bw+x]=im.d[(y0+y)*im.w+x0+x];
+  const bg=pctl(sub,80), lo=pctl(sub,3), thr=0.3*Math.max(1, bg-lo);
+  const ys=[], xs=[], w=[];
+  for (let y=0;y<h;y++) for (let x=0;x<bw;x++){ const v=bg-sub[y*bw+x]; if (v>0 && v>=thr){ ys.push(y); xs.push(x); w.push(v); } }
+  let f=wfit(ys,xs,w,null); if (!f) return null;
+  for (let it=0; it<2; it++){
+    const keep=xs.map((x,i)=>Math.abs(x-(f[0]+f[2]*(ys[i]-f[1])))<=0.35*bw);
+    const g=wfit(ys,xs,w,keep); if (!g) break; f=g;
+  }
+  const [xm,ym,s]=f, drift=Math.abs(s)*h; if (drift<0.2*bw) return null;
+  const tw=bw-drift, d=[]; for (let i=0;i<xs.length;i++){ const v=Math.abs(xs[i]-(xm+s*(ys[i]-ym))); if (v<=0.6*bw) d.push(v); }
+  const p = d.length ? pctl(d,95) : tw/2, hw=Math.round(Math.min(bw/2, Math.max(tw/2, p)+3)), ww=2*hw+1;
+  const out=new Uint8Array(ww*h).fill(255);
+  for (let y=0;y<h;y++){
+    const c=Math.round(x0+xm+s*(y-ym)), l=c-hw, xa=Math.max(l,0), xb=Math.min(l+2*hw, im.w-1);
+    for (let x=xa;x<=xb;x++) out[y*ww+x-l]=im.d[(y0+y)*im.w+x];
+  }
+  return {w:ww, h, d:out, slope:s};
+};
+KP.prepLineBox = function(im, box){
+  const st=KP.skewStrip(im, box);
+  if (!st) return KP.prepLine(im, box[0], box[2], box[1], box[3]);
+  return toInput(autocontrast(cropRot(st, 0, 0, st.w, st.h)));
+};
+
 // 한 행 잘라 90도 돌리고 autocontrast(1%) → 높이 64로 줄이기 (PIL 방식 그대로)
 function cropRot(im, x0, y0, x1, y1){ // PIL crop: 바깥은 0
   const w0=x1-x0, h0=y1-y0, out=new Uint8Array(w0*h0); // 돌린 그림: 너비 h0, 높이 w0

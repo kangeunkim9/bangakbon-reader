@@ -512,7 +512,7 @@ function gc(name){ try { window.goatcounter && window.goatcounter.count && windo
 // 행 그림 만들기: 필사본이면 휜 경계를 따라 자른다(경계는 면마다 한 번 계산해 seg에 둔다)
 function prepCol(g, seg, k){
   const [x0,x1]=seg.cols[k];
-  if (seg.rows) return KP.prepLine(g,x0,x1,seg.rows[k][0],seg.rows[k][1]);   // 행 찾기 모델이 준 상자(행마다 위아래가 다름)
+  if (seg.rows) return KP.prepLineBox(g,[x0,seg.rows[k][0],x1,seg.rows[k][1]]);   // 행 찾기 모델이 준 상자(행마다 위아래가 다름). 기운 행은 기울기를 따라 오려 곧게 세운다
   if (state.runKind==='pilsa'){
     if (!seg.paths){ try { seg.paths=KP.seams(g,seg); } catch(e){ seg.paths={}; } }
     const L=seg.paths[x0], R=seg.paths[x1];
@@ -659,7 +659,8 @@ async function layoutBoxes(g){
   return res;
 }
 function segFromBoxes(bs, g){
-  bs=bs.slice().sort((p,q)=>q[0]-p[0]);   // 오른쪽 행부터
+  bs=KP.cleanBoxes(bs, g.w, g.h);   // 겹친 상자 합치기, 로고·덧쓴 글자 같은 작은 상자 빼기. 오른쪽 행부터
+  if (!bs.length) return {t:0, bt:g.h, cols:[]};
   const cols=bs.map(b=>[Math.max(0,b[0]),Math.min(g.w-1,b[2])]), rows=bs.map(b=>[Math.max(0,b[1]),Math.min(g.h,b[3])]);
   return {t:Math.min(...rows.map(r=>r[0])), bt:Math.max(...rows.map(r=>r[1])), cols, rows};
 }

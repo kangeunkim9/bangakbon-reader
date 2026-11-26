@@ -71,7 +71,7 @@ def seams(g, t, bt, cols):
     """곧은 경계를 출발점으로, 먹을 덜 지나는 휜 경계(위→아래 단조, 서로 안 겹침)를 동적 계획법으로 찾는다."""
     b=binar(g); Hh,W=b.shape
     lines=cv2.morphologyEx(b,cv2.MORPH_OPEN,np.ones((Hh//4,1),np.uint8))
-    ink=cv2.GaussianBlur((b&(1-lines)).astype(np.float32),(0,0),2.5)
+    ink=cv2.GaussianBlur((b&(1-lines)).astype(np.float64),(0,0),2.5)
     xs=sorted({x for ac in cols for x in ac}); pitch=np.median(np.diff(xs)) if len(xs)>1 else 80
     paths=[]
     for i,x in enumerate(xs):
@@ -96,3 +96,57 @@ def crop_curved(g, t, bt, L, R, pad=3):
         xa,xb=max(x0,l),min(x0+w-1,r)
         if xb>=xa: out[y,xa-x0:xb-x0+1]=a[t+y,xa:xb+1]
     return Image.fromarray(out)
+
+def clean_boxes(bs, W, H):
+    """행 찾기 상자 다듬기: 가로로 누운 상자(로고·쪽번호)와 아주 작은 상자(덧쓴 글자·표시)는 빼고, 같은 행을 두 번 잡은 상자는 합친다."""
+    bs=[list(map(int,b)) for b in bs if (b[3]-b[1])>=(b[2]-b[0])]
+    if not bs: return []
+    mh=float(np.median([b[3]-b[1] for b in bs]))
+    bs=[b for b in bs if b[3]-b[1]>=0.15*mh]
+    bs.sort(key=lambda b:-(b[3]-b[1]))
+    out=[]
+    for b in bs:
+        for o in out:
+            ov=min(b[2],o[2])-max(b[0],o[0]); mw=min(b[2]-b[0],o[2]-o[0])
+            yo=min(b[3],o[3])-max(b[1],o[1])
+            if ov>0.5*mw and (yo>0.3*(b[3]-b[1]) or -yo<0.02*H):
+                o[:]=[min(o[0],b[0]),min(o[1],b[1]),max(o[2],b[2]),max(o[3],b[3])]; break
+        else: out.append(b)
+    return sorted(out,key=lambda b:-b[0])
+def _fit(ys, xs, w):
+    sw=w.sum()
+    if sw<=0: return None
+    ym=(ys*w).sum()/sw; xm=(xs*w).sum()/sw
+    v=((ys-ym)**2*w).sum()
+    b=((ys-ym)*(xs-xm)*w).sum()/v if v>0 else 0.0
+    return xm, ym, max(-0.25,min(0.25,b))
+def crop_skew(g, box):
+    """기운 행: 상자 안 먹으로 행 가운데 줄(x = xm + s·(y-ym))을 재고, 그 줄을 따라 같은 폭으로 오려 곧게 세운다.
+    거의 곧은 행이면 None(원래대로 상자째 자른다)."""
+    a=np.asarray(g,dtype=np.float64); Hh,W=a.shape
+    x0,y0,x1,y1=box; bw=x1-x0; h=y1-y0
+    if bw<4 or h<4: return None
+    sub=a[y0:y1,x0:x1]
+    bg=np.percentile(sub,80); lo=np.percentile(sub,3)
+    ink=np.clip(bg-sub,0,None); ink[ink<0.3*max(1.0,bg-lo)]=0
+    yy,xx=np.nonzero(ink); w=ink[yy,xx]
+    f=_fit(yy.astype(np.float64),xx.astype(np.float64),w)
+    if f is None: return None
+    xm,ym,s=f
+    for _ in range(2):   # 옆 행 먹을 덜 보도록 가운데 줄 근처 먹만으로 다시 잰다
+        k=np.abs(xx-(xm+s*(yy-ym)))<=0.35*bw
+        f=_fit(yy[k].astype(np.float64),xx[k].astype(np.float64),w[k])
+        if f is None: break
+        xm,ym,s=f
+    drift=abs(s)*h
+    if drift<0.2*bw: return None
+    tw=bw-drift   # 기울기만큼 뺀 실제 행 폭
+    d=np.abs(xx-(xm+s*(yy-ym))); k=d<=0.6*bw
+    p=float(np.percentile(d[k],95)) if k.any() else tw/2
+    hw=int(round(min(bw/2, max(tw/2, p)+3)))
+    out=np.full((h,2*hw+1),255,np.uint8)
+    for y in range(h):
+        c=int(round(x0+xm+s*(y-ym))); l=c-hw
+        xa,xb=max(l,0),min(l+2*hw,W-1)
+        if xb>=xa: out[y,xa-l:xb-l+1]=a[y0+y,xa:xb+1].astype(np.uint8)
+    return out, s, hw

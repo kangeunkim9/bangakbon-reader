@@ -10,7 +10,7 @@ sys.modules.update({'google': _g, 'google.colab': _c, 'google.colab.drive': _d})
 RAW = 'https://raw.githubusercontent.com/kangeunkim9/bangakbon-reader/main/training/'
 src = requests.get(RAW + 'train_svtrv2_pilsa.py', timeout=60).text
 G = {'__name__': 'evalg', 'SV_EP': 6}
-exec(src[:src.index('# ---------------- 4) 학습')], G)        # 자료와 v2 모델, 정답 점검 결과(저장된 것)까지
+exec(src[:src.index('\n# ---------------- 4) 학습 (')], G)        # 자료와 v2 모델, 정답 점검 결과(저장된 것)까지
 torch, read_s, lev, graphemes, DEV = G['torch'], G['read_s'], G['lev'], G['graphemes'], G['DEV']
 ROOT, svm = G['ROOT'], G['svm']
 

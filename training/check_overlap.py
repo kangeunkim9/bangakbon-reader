@@ -3,12 +3,18 @@
 # 방법: 띄어쓰기·문장부호를 뺀 글자열을 12글자씩 잘라(12-gram), 검증 작품의 12-gram 가운데
 #       학습 자료의 한 책에도 들어 있는 비율을 책마다 센다. 같은 판본이면 대개 50%를 넘고, 다른 판본이면 몇 % 안팎이다.
 # 결과: 화면 출력과 드라이브 방각본_판독기/검증_학습_겹침.tsv
-import os, re, json, glob, zipfile, unicodedata, collections, zlib, sys
+import os, re, json, glob, zipfile, unicodedata, collections, zlib, sys, subprocess
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'hypua2jamo'], check=False)
+import hypua2jamo                            # 한양 PUA(옛한글 사용자 정의 영역) -> 첫가끝 자모
 ROOT = '/content/drive/MyDrive/방각본_판독기'
 N = 12
 nfc = lambda s: unicodedata.normalize('NFC', s)
 KEEP = re.compile(r'[^\w〃□]')
-def norm(s): return KEEP.sub('', re.sub(r'\s+', '', nfc(s)))
+HAN = re.compile(r'[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]')     # 한자 병기는 뺀다(판독 정답은 한글만)
+def norm(s):
+    if any(0xE000 <= ord(c) <= 0xF8FF for c in s): s = hypua2jamo.translate(s, composed=True)
+    s = re.sub(r'<[^>]*>', '', s)            # KOHICO 꼴 태그
+    return KEEP.sub('', HAN.sub('', re.sub(r'\s+', '', nfc(s))))
 def grams(s):
     s = norm(s)
     return {zlib.crc32(s[i:i + N].encode('utf-8')) for i in range(len(s) - N + 1)}
@@ -18,15 +24,18 @@ VD = [os.path.join(ROOT, d) for d in os.listdir(ROOT) if nfc(d).startswith('8_')
 VAL = {}
 for dp, dn, fn in os.walk(VD):
     for f in fn:
-        if not f.lower().endswith('.txt') or nfc(f).startswith('_'): continue
-        p = os.path.join(dp, f)
-        try: t = open(p, encoding='utf-8').read()
-        except UnicodeDecodeError: t = open(p, encoding='cp949', errors='ignore').read()
+        if not f.lower().endswith('.txt') or nfc(f).startswith('_') or nfc(f) == '출처.txt': continue
+        p = os.path.join(dp, f); b = open(p, 'rb').read()
+        if b[:2] in (b'\xff\xfe', b'\xfe\xff'): t = b.decode('utf-16', errors='ignore')
+        elif b[:3] == b'\xef\xbb\xbf': t = b[3:].decode('utf-8', errors='ignore')
+        else:
+            try: t = b.decode('utf-8')
+            except UnicodeDecodeError: t = b.decode('cp949', errors='ignore')
         work = nfc(os.path.basename(dp)) if nfc(os.path.basename(dp)) != '원문' else nfc(os.path.basename(os.path.dirname(dp)))
         key = work + ' / ' + nfc(f)
         g = grams(t)
         if g: VAL[key] = g
-print('검증 정답 파일', len(VAL), '개', flush=True)
+print('검증 정답 파일', len(VAL), '개 / 12-gram', sum(map(len, VAL.values())), flush=True)
 IDX = collections.defaultdict(list)
 for k, g in VAL.items():
     for h in g: IDX[h].append(k)

@@ -329,7 +329,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 <script>
 // 판독 모델. 되돌릴 때는 아래 USE를 M10으로 바꾼다. 주소 끝에 ?model=10을 붙이면 10차로 읽는다(비교용)
 const M10 = {model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], charset: 'charset_v10.json', fmt: 'crnn', approxMB: 47, label: '10차 모델'};
-const MSV = {model: [0,1,2,3,4,5,6,7,8].map(i=>`model_vsvtr2_${i}.wasm`), charset: 'charset_v10.json', fmt: 'svtr', approxMB: 92, label: 'SVTRv2 모델'};   // OpenOCR SVTRv2(Apache-2.0)를 옛한글로 다시 학습
+const MSV = {model: [0,1,2,3,4,5,6,7,8].map(i=>`model_vsvtrp1_${i}.wasm`), charset: 'charset_v10.json', fmt: 'svtr', approxMB: 92, label: 'SVTRv2 모델'};   // OpenOCR SVTRv2(Apache-2.0)를 옛한글로 다시 학습, AI허브 필사본을 더 배운 판(p1)
 const USE = new URLSearchParams(location.search).get('model')==='10' ? M10 : MSV;
 const CFG = {
   ...USE, modelLabel: USE.label,

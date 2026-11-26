@@ -7,6 +7,7 @@
 # 5) 시험: 경판 검증, 필사본(유이양문록·명행정의록8), 언간(경주최씨댁한글편지, 흘림체), 심청전, 금향졍긔
 # 시험용 책은 학습에서 뺀다. 결과는 드라이브 svtrv2_model_p1.pt, result_svtrv2_p1.json
 import os, re, json, random, zipfile, time
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')   # 메모리 조각남 줄이기(런타임 새로 시작했을 때만 먹힘)
 SV_TAG = 'p1'; SV_EP = globals().get('SV_EP', 6)
 SV_INIT = '/content/drive/MyDrive/방각본_판독기/svtrv2_model_v2.pt'
 import requests
@@ -74,7 +75,8 @@ v0 = val_s(svm); print(f'출발점(v2)  경판 검증 {v0[0]*100:.2f}%  필사�
 
 # ---------------- 4) 학습 (에폭마다 드라이브에 저장, 끊기면 이어서) ----------------
 EP = SV_EP; NAH = min(len(AHtr), 25000); NPS = min(len(PALL), 60000); REP_IN = 3
-BS = 24 if torch.cuda.get_device_properties(0).total_memory > 20e9 else 16   # T4(16GB)면 16
+BS = 24 if torch.cuda.get_device_properties(0).total_memory > 20e9 else 12   # T4(16GB)면 12
+gc.collect(); torch.cuda.empty_cache(); n_oom = 0
 per = len(KTR) + REP_IN * len(INTR) + NAH + NPS; steps = EP * (per // BS)
 opt = torch.optim.AdamW(svm.parameters(), lr=1.5e-4, weight_decay=0.05)
 sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=1.5e-4, total_steps=steps, pct_start=0.05)
@@ -92,12 +94,17 @@ for ep in range(ep0, EP + 1):
     svm.train(); t0 = time.time(); tot = 0; n = 0
     for x, tg in dl:
         x = x.to(DEV)
-        with torch.autocast('cuda', dtype=AMP):
-            y = svm(x)
-        lp = y.float().log_softmax(-1).permute(1, 0, 2)
-        tl = torch.tensor([len(t) for t in tg])
-        loss = ctc(lp, torch.tensor(sum(tg, [])), torch.full((len(tg),), lp.shape[0], dtype=torch.long), tl)
-        opt.zero_grad(); scaler.scale(loss).backward(); scaler.unscale_(opt); nn.utils.clip_grad_norm_(svm.parameters(), 5); scaler.step(opt); scaler.update()
+        try:
+            with torch.autocast('cuda', dtype=AMP):
+                y = svm(x)
+            lp = y.float().log_softmax(-1).permute(1, 0, 2)
+            tl = torch.tensor([len(t) for t in tg])
+            loss = ctc(lp, torch.tensor(sum(tg, [])), torch.full((len(tg),), lp.shape[0], dtype=torch.long), tl)
+            opt.zero_grad(); scaler.scale(loss).backward(); scaler.unscale_(opt); nn.utils.clip_grad_norm_(svm.parameters(), 5); scaler.step(opt); scaler.update()
+        except torch.OutOfMemoryError:   # 아주 긴 행이 몰린 묶음은 건너뛴다
+            del x; opt.zero_grad(set_to_none=True); y = lp = loss = None; gc.collect(); torch.cuda.empty_cache(); n_oom += 1
+            if n_oom % 10 == 1: print('  메모리 부족으로 건너뛴 묶음', n_oom, flush=True)
+            continue
         if sch.last_epoch + 1 < steps: sch.step()
         tot += loss.item(); n += 1
         if n % 1000 == 0: print(f'  {ep}에폭 {n}걸음 loss {tot/n:.3f} {time.time()-t0:.0f}s', flush=True)

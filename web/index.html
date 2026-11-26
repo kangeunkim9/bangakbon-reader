@@ -309,16 +309,16 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     </div>
     <div>
       <h3>정확도</h3>
-      <p>글자 오류율은 <b>경판 약 4%</b>, <b>완판 약 3%</b>, <b>궁체 필사본 약 6%</b>입니다. 모두 학습에 쓰지 않은 책으로 잰 값입니다. 흘림 필사본은 아직 잘 못 읽습니다. 판독문은 검토용 초벌로 쓰세요.</p>
-      <p>지금 판독 모델(10차)은 경판 17종, AI허브 옛한글 목판본 약 14만 행, 장서각 국문장편소설 필사본 약 2만 9천 행으로 학습했습니다.</p>
+      <p>글자 오류율은 <b>경판 약 3.5%</b>, <b>완판 약 2.5%</b>, <b>궁체 필사본 약 4%</b>입니다. 모두 학습에 쓰지 않은 책으로 잰 값입니다. 흘림 필사본은 아직 잘 못 읽습니다. 판독문은 검토용 초벌로 쓰세요.</p>
+      <p>지금 판독 모델은 공개 글자 인식 모델 SVTRv2(OpenOCR)를 바탕으로 경판 17종, AI허브 옛한글 목판본 약 14만 행, 장서각 국문장편소설 필사본 약 2만 9천 행을 다시 학습시킨 것입니다.</p>
     </div>
     <div>
       <h3>자료와 저장</h3>
-      <p>올린 자료는 이 브라우저 안에서만 처리되고 어디에도 보내지 않습니다. 처음 판독할 때 엔진 파일(약 47MB)을 한 번 내려받습니다.</p>
+      <p>올린 자료는 이 브라우저 안에서만 처리되고 어디에도 보내지 않습니다. 처음 판독할 때 엔진 파일(약 90MB)을 한 번 내려받습니다.</p>
       <p>판독문은 바로 고칠 수 있습니다. 고친 내용은 이 브라우저에 저절로 저장되어, 창을 닫았다가 같은 파일을 다시 올리면 이어서 볼 수 있습니다.</p>
       <p>검수를 마친 면은 <b>학습용으로 보내기</b>를 누르면 면 사진과 고친 판독문이 이 판독기에 모이고, 다음 판 모델을 학습시킬 때 쓰입니다. 원문 표기 그대로, 띄어쓰기 없이 적어 주세요.</p>
     </div>
-        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실<br>자료: 국립중앙도서관 소장본(위키미디어 공용), 국립국어원 「국어 역사 자료 말뭉치 2023」, AI 허브 「옛한글 문자인식(OCR) 인공지능 학습용 데이터」, 장서각 국문장편소설 전사문<br>필사본 행 찾기는 일본 국립국회도서관 <a href="https://github.com/ndl-lab/ndlocr-lite" target="_blank" rel="noopener">NDLOCR-Lite</a>(CC BY 4.0) 모델을 씁니다<br>코드는 MIT 라이선스, 모델은 비영리 연구·교육용 · <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a></p>
+        <p class="credit">기획·제작 성균관대학교 국어국문학과 고전소설 연구실<br>자료: 국립중앙도서관 소장본(위키미디어 공용), 국립국어원 「국어 역사 자료 말뭉치 2023」, AI 허브 「옛한글 문자인식(OCR) 인공지능 학습용 데이터」, 장서각 국문장편소설 전사문<br>글자 판독 모델은 <a href="https://github.com/Topdu/OpenOCR" target="_blank" rel="noopener">OpenOCR</a>의 SVTRv2(Apache-2.0)를 옛한글로 다시 학습시킨 것이고, 필사본 행 찾기는 일본 국립국회도서관 <a href="https://github.com/ndl-lab/ndlocr-lite" target="_blank" rel="noopener">NDLOCR-Lite</a>(CC BY 4.0) 모델을 씁니다<br>코드는 MIT 라이선스, 모델은 비영리 연구·교육용 · <a href="https://github.com/kangeunkim9/bangakbon-reader" target="_blank" rel="noopener">GitHub</a></p>
   </section>
 </div>
 
@@ -540,11 +540,7 @@ KP.prepLineCurved = function(im, L, R, t, bt){
     for (let x=xa;x<=xb;x++) out[y*w+x-x0]=im.d[(t+y)*im.w+x];
   }
   let rr = cropRot({w, h:Hb, d:out}, 0, 0, w, Hb);
-  rr = autocontrast(rr);
-  const nw = Math.min(MAXW, Math.max(32, Math.trunc(rr.w*H/rr.h)));
-  rr = resizeBilinear(rr, nw, H);
-  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-rr.d[i]/255;
-  return {data:f, w:nw};
+  return toInput(autocontrast(rr));
 };
 
 // 한 행 잘라 90도 돌리고 autocontrast(1%) → 높이 64로 줄이기 (PIL 방식 그대로)
@@ -607,12 +603,24 @@ function resizeBilinear(im, ow, oh){ // Pillow ImagingResample, 8비트: 가로 
 }
 KP.prepLine = function(im, a, c, t, bt){
   let r = cropRot(im, Math.max(0,a-3), t, c+3, bt);
-  r = autocontrast(r);
-  const nw = Math.min(MAXW, Math.max(32, Math.trunc(r.w*H/r.h)));
-  r = resizeBilinear(r, nw, H);
-  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-r.d[i]/255;
-  return {data:f, w:nw};
+  return toInput(autocontrast(r));
 };
+// 판독 모델마다 받는 행 그림 꼴이 다르다.
+//  crnn(10차까지): 높이 64, 1채널, 먹=1 바탕=0, 너비 그대로(최대 1600)
+//  svtr(SVTRv2): 높이 48, 3채널, -1~1(바탕=+1), 너비 최대 1280을 32의 배수로 채움(흰 바탕)
+KP.FMT = 'crnn';
+function toInput(r){
+  if (KP.FMT==='svtr'){
+    const SH=48, nw=Math.min(1280, Math.max(64, Math.trunc(r.w*SH/r.h)));
+    const z=resizeBilinear(r, nw, SH), W=Math.ceil(nw/32)*32, f=new Float32Array(3*SH*W).fill(1);
+    for (let y=0;y<SH;y++) for (let x=0;x<nw;x++){ const v=z.d[y*nw+x]/127.5-1; f[y*W+x]=v; f[SH*W+y*W+x]=v; f[2*SH*W+y*W+x]=v; }
+    return {data:f, w:W, shape:[1,3,SH,W]};
+  }
+  const nw = Math.min(MAXW, Math.max(32, Math.trunc(r.w*H/r.h)));
+  const z = resizeBilinear(r, nw, H);
+  const f = new Float32Array(nw*H); for (let i=0;i<f.length;i++) f[i]=1-z.d[i]/255;
+  return {data:f, w:nw, shape:[1,1,H,nw]};
+}
 
 // ---------- 디코딩 ----------
 KP.logSoftmax = function(y, T, C){
@@ -717,13 +725,17 @@ window.KP = KP;
 
 </script>
 <script>
+// 판독 모델. 되돌릴 때는 아래 USE를 M10으로 바꾼다. 주소 끝에 ?model=10을 붙이면 10차로 읽는다(비교용)
+const M10 = {model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], charset: 'charset_v10.json', fmt: 'crnn', approxMB: 47, label: '10차 모델'};
+const MSV = {model: [0,1,2,3,4,5,6,7,8].map(i=>`model_vsvtr2_${i}.wasm`), charset: 'charset_v10.json', fmt: 'svtr', approxMB: 92, label: 'SVTRv2 모델'};   // OpenOCR SVTRv2(Apache-2.0)를 옛한글로 다시 학습
+const USE = new URLSearchParams(location.search).get('model')==='10' ? M10 : MSV;
 const CFG = {
-  model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], modelLabel: '10차 모델', charset: 'charset_v10.json',
+  ...USE, modelLabel: USE.label,
   // 필사본을 고르면 이 모델과 휜 행 나누기를 쓴다
-  pilsa: {model: ['model_v10_0.wasm','model_v10_1.wasm','model_v10_2.wasm','model_v10_3.wasm'], modelLabel: '10차 모델(필사본)', charset: 'charset_v10.json',
+  pilsa: {...USE, modelLabel: USE.label+'(필사본)',
     layout: ['ndl_layout_0.wasm','ndl_layout_1.wasm','ndl_layout_2.wasm','ndl_layout_3.wasm','ndl_layout_4.wasm'], layoutMB: 40},   // 행 찾기: NDLOCR-Lite(일본 국립국회도서관, CC BY 4.0)의 DEIMv2 모델
   lm: 'lm7.gz.wasm', spacer: 'spacer.wasm', spacerVocab: 'spacer_vocab.json', pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
-  approxMB: 47, github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
+  github: true, minConf: 0.85, lineConf: 0.97, inbox: "https://script.google.com/macros/s/AKfycbzZE-lBRWIB27h4Qr_-i5XwCC4wFpTZ9Qu2iARWsxz-7qWgHlxXVwgyy_4oPbtgXdTOwg/exec", issues: 'https://github.com/kangeunkim9/bangakbon-reader/issues/new'
 };
 if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; }), document.getElementById('lm').checked=false;
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
@@ -742,10 +754,10 @@ async function fetchBytes(url, onBytes){
   const out = new Uint8Array(n); let o=0; for (const c of chunks){ out.set(c,o); o+=c.length; } return out;
 }
 async function loadEngine(needLM){
-  const K=kindCfg(), key=K.model.join(',');
+  const K=kindCfg(), key=K.model.join(','); KP.FMT = K.fmt||'crnn';
   state.eng = state.engs[key] || null;
   if (!state.eng){
-    let got=0; const tick=(n)=>{ got+=n; setMsg(`판독 엔진 내려받는 중 ${(got/1e6).toFixed(0)} / 약 ${CFG.approxMB}MB (처음 한 번만)`); setBar(got/(CFG.approxMB*1e6)); };
+    let got=0; const tick=(n)=>{ got+=n; setMsg(`판독 엔진 내려받는 중 ${(got/1e6).toFixed(0)} / 약 ${K.approxMB}MB (처음 한 번만)`); setBar(got/(K.approxMB*1e6)); };
     ort.env.wasm.wasmPaths='./'; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
     const parts = await Promise.all(K.model.map(u=>fetchBytes(u,tick)));
     const buf = new Uint8Array(parts.reduce((a,b)=>a+b.length,0)); let o=0; for (const p of parts){ buf.set(p,o); o+=p.length; }
@@ -768,11 +780,45 @@ onmessage = async (e) => { const m = e.data;
   try {
     if (m.type==='init'){ importScripts(m.ortUrl); ort.env.wasm.wasmPaths=m.wasmPaths; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
       sess = await ort.InferenceSession.create(new Uint8Array(m.model), {executionProviders:['wasm']}); postMessage({type:'ready'}); }
-    else if (m.type==='run'){ const out = await sess.run({x:new ort.Tensor('float32', m.data, [1,1,64,m.w])});
+    else if (m.type==='run'){ const out = await sess.run({x:new ort.Tensor('float32', m.data, m.shape)});
       const y = out.y.data.slice(); postMessage({type:'done', id:m.id, y, T:out.y.dims[1], C:out.y.dims[2]}, [y.buffer]); }
   } catch(err){ postMessage({type:'error', id:m.id, msg:String((err&&err.message)||err)}); }
 };`;
+// 그래픽 카드(WebGPU)를 쓸 수 있으면 워커 하나에서 그래픽 카드로 읽는다. 안 되면 아래 CPU 워커로 읽는다. ?cpu를 붙이면 CPU로만 읽는다
+const GPU_WORKER_SRC = `let sess, q=Promise.resolve();
+onmessage = (e) => { const m = e.data;
+  q = q.then(async()=>{ try {
+    if (m.type==='init'){ importScripts(m.ortUrl); ort.env.wasm.wasmPaths=m.wasmPaths; ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false;
+      sess = await ort.InferenceSession.create(new Uint8Array(m.model), {executionProviders:['webgpu']});
+      const px={x:new ort.Tensor('float32', new Float32Array(m.probe.reduce((a,b)=>a*b,1)).fill(1), m.probe)};
+      await sess.run(px); const t=performance.now(); await sess.run(px); postMessage({type:'ready', ms:performance.now()-t}); }
+    else if (m.type==='run'){ const out = await sess.run({x:new ort.Tensor('float32', m.data, m.shape)});
+      const y = Float32Array.from(out.y.data); postMessage({type:'done', id:m.id, y, T:out.y.dims[1], C:out.y.dims[2]}, [y.buffer]); }
+  } catch(err){ postMessage({type:'error', id:m.id, msg:String((err&&err.message)||err)}); } });
+};`;
+// 그래픽 카드용은 요즘 크롬에 맞는 새 판(1.20.1)을 쓴다. 엔진 파일도 같은 곳에서 받는다
+const ORT_GPU_DIR = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/', ORT_GPU_URL = ORT_GPU_DIR+'ort.webgpu.min.js';
+async function makeGpuRunner(buf, cs, wasmPaths){
+  if (!('gpu' in navigator) || new URLSearchParams(location.search).has('cpu') || typeof Worker==='undefined') return null;
+  try { if (!(await navigator.gpu.requestAdapter())) return null; } catch(e){ return null; }
+  const url = URL.createObjectURL(new Blob([GPU_WORKER_SRC], {type:'text/javascript'}));
+  const w = new Worker(url);
+  try {
+    await new Promise((res,rej)=>{ const to=setTimeout(()=>rej(new Error('그래픽 카드 준비 시간 초과')), 30000);
+      w.onmessage=(e)=>{ clearTimeout(to); if (e.data.type!=='ready') return rej(new Error(e.data.msg));
+        console.log('그래픽 카드 한 행 시험', Math.round(e.data.ms), 'ms');
+        e.data.ms>400 ? rej(new Error('그래픽 카드가 CPU보다 느림')) : res(); };
+      w.onerror=(e)=>{ clearTimeout(to); rej(new Error(e.message||'워커 오류')); };
+      w.postMessage({type:'init', ortUrl:ORT_GPU_URL, wasmPaths, model: buf.slice().buffer, probe: KP.FMT==='svtr'?[1,3,48,640]:[1,1,64,640]}); });
+  } catch(e){ console.warn('그래픽 카드로 읽지 못해 CPU로 읽습니다:', e); w.terminate(); return null; }
+  const wait = new Map(); let id=0;
+  w.onmessage=(e)=>{ const m=e.data, cb=wait.get(m.id); if (!cb) return; wait.delete(m.id); m.type==='done' ? cb.res({y:m.y, T:m.T, C:m.C}) : cb.rej(new Error(m.msg)); };
+  const run = (data, shape)=>new Promise((res,rej)=>{ const k=++id; wait.set(k,{res,rej}); const d=data.slice(); w.postMessage({type:'run', id:k, data:d, shape}, [d.buffer]); });
+  return {run, par:2, cs, dev:'gpu'};
+}
 async function makeRunners(buf, cs){
+  const gpu = await makeGpuRunner(buf, cs, ORT_GPU_DIR);
+  if (gpu) return gpu;
   const qn = +new URLSearchParams(location.search).get('workers');   // 시험용: ?workers=N
   const n = qn>0 ? Math.min(8,qn) : Math.max(1, Math.min(6, Math.floor((navigator.hardwareConcurrency||2)*0.6)));   // 12코어 6개, 8코어 4개, 4코어 2개
   if (n>=2 && typeof Worker!=='undefined'){
@@ -788,13 +834,13 @@ async function makeRunners(buf, cs){
       })));
       const wait = new Map(); let id=0; const busy = ws.map(()=>0);
       ws.forEach((w,i)=>{ w.onmessage=(e)=>{ const m=e.data, cb=wait.get(m.id); if (!cb) return; wait.delete(m.id); busy[i]--; m.type==='done' ? cb.res({y:m.y, T:m.T, C:m.C}) : cb.rej(new Error(m.msg)); }; });
-      const run = (data, w)=>new Promise((res,rej)=>{ let i=0; for (let k=1;k<ws.length;k++) if (busy[k]<busy[i]) i=k; busy[i]++; const k=++id; wait.set(k,{res,rej}); const d=data.slice(); ws[i].postMessage({type:'run', id:k, data:d, w}, [d.buffer]); });
-      return {run, par:ws.length, cs};
+      const run = (data, shape)=>new Promise((res,rej)=>{ let i=0; for (let k=1;k<ws.length;k++) if (busy[k]<busy[i]) i=k; busy[i]++; const k=++id; wait.set(k,{res,rej}); const d=data.slice(); ws[i].postMessage({type:'run', id:k, data:d, shape}, [d.buffer]); });
+      return {run, par:ws.length, cs, dev:'cpu'};
     } catch(e){ console.warn('워커를 쓰지 못해 한 개로 읽습니다:', e); }
   }
   const sess = await ort.InferenceSession.create(buf, {executionProviders:['wasm']});
-  const run = async (data, w)=>{ const out = await sess.run({x:new ort.Tensor('float32', data, [1,1,64,w])}); return {y:out.y.data, T:out.y.dims[1], C:out.y.dims[2]}; };
-  return {run, par:1, cs, sess};
+  const run = async (data, shape)=>{ const out = await sess.run({x:new ort.Tensor('float32', data, shape)}); return {y:out.y.data, T:out.y.dims[1], C:out.y.dims[2]}; };
+  return {run, par:1, cs, sess, dev:'cpu'};
 }
 
 // ---------- 입력 읽기 ----------
@@ -912,7 +958,7 @@ async function run(only){ if (typeof only!=='number') only=0; if (!only) gc('판
         let n=seg.cols.length, res=new Array(n); let got=0;
         const one=async(k)=>{
           const p=prepCol(g,seg,k);
-          const tl=performance.now(); const {y,T,C}=await eng.run(p.data,p.w); lineMs.push((performance.now()-tl)/eng.par);
+          const tl=performance.now(); const {y,T,C}=await eng.run(p.data,p.shape); lineMs.push((performance.now()-tl)/eng.par);
           const lp=KP.logSoftmax(y,T,C); const text = useLM ? KP.beam(lp,T,C,eng.cs,eng.LM) : KP.greedy(lp,T,C,eng.cs);
           let sm=0, nn=0; for (let t=0;t<T;t++){ let m=-Infinity, kk=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; kk=c; } if (kk){ sm+=Math.exp(m); nn++; } }
           res[k]={text, conf:nn?sm/nn:0}; got++;
@@ -933,7 +979,7 @@ async function run(only){ if (typeof only!=='number') only=0; if (!only) gc('판
           if (sm.cols.length>=6){
             const cs=[];
             for (const k of [...Array(Math.min(6,sm.cols.length)).keys()]){
-              const p=prepCol(gm,sm,k); const {y,T,C}=await eng.run(p.data,p.w); const lp=KP.logSoftmax(y,T,C);
+              const p=prepCol(gm,sm,k); const {y,T,C}=await eng.run(p.data,p.shape); const lp=KP.logSoftmax(y,T,C);
               let s2=0, n2=0; for (let t=0;t<T;t++){ let m=-Infinity, kk=0; for (let c=0;c<C;c++) if (lp[t*C+c]>m){ m=lp[t*C+c]; kk=c; } if (kk){ s2+=Math.exp(m); n2++; } }
               cs.push(n2?s2/n2:0);
             }

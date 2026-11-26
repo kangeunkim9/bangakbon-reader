@@ -10,7 +10,7 @@ eng = open(f'{H}/engine.js', encoding='utf-8').read()
 S = {'name':'금향졍긔 권하','title':'금향졍긔 권하 PDF 21쪽','no':21,'W':1500,'H':1910,
      't':J['t'],'bt':J['bt'],'cols':J['cols'],'lines':J.get('beam') or J['greedy']}   # 언어 모델 보정을 켠 결과
 gh = (src.replace('/*ENGINE*/', eng).replace('/*SAMPLE*/', json.dumps(S, ensure_ascii=False))
-         .replace("approxMB: 47, github: false", "approxMB: 47, github: true")
+         .replace("  github: false,", "  github: true,")
          .replace("inbox: ''", "inbox: " + json.dumps(INBOX)))
 assert "lm: 'lm7.gz.wasm'," in gh and "github: true" in gh
 SK = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'

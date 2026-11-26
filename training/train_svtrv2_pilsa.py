@@ -12,7 +12,7 @@ SV_INIT = '/content/drive/MyDrive/방각본_판독기/svtrv2_model_v2.pt'
 import requests
 RAW = 'https://raw.githubusercontent.com/kangeunkim9/bangakbon-reader/main/training/'
 _src = requests.get(RAW + 'train_svtrv2.py', timeout=60).text
-exec(_src[:_src.index('# ---------------- 4)')], globals())        # 1)~3): 자료, 모델(v2에서 출발), 전처리
+exec(_src[:_src.index('\n# ---------------- 4) 학습')], globals())        # 1)~3): 자료, 모델(v2에서 출발), 전처리
 
 # ---------------- 2) 필사본 전체 묶음 ----------------
 PD = '/content/pilsa_lines_all'
@@ -64,7 +64,8 @@ def val_s(m):
 v0 = val_s(svm); print(f'출발점(v2)  경판 검증 {v0[0]*100:.2f}%  필사본 {v0[1]*100:.2f}%  언간 {v0[2]*100:.2f}%', flush=True)
 
 # ---------------- 4) 학습 (에폭마다 드라이브에 저장, 끊기면 이어서) ----------------
-EP = SV_EP; NAH = min(len(AHtr), 25000); NPS = min(len(PALL), 60000); BS = 24; REP_IN = 3
+EP = SV_EP; NAH = min(len(AHtr), 25000); NPS = min(len(PALL), 60000); REP_IN = 3
+BS = 24 if torch.cuda.get_device_properties(0).total_memory > 20e9 else 16   # T4(16GB)면 16
 per = len(KTR) + REP_IN * len(INTR) + NAH + NPS; steps = EP * (per // BS)
 opt = torch.optim.AdamW(svm.parameters(), lr=1.5e-4, weight_decay=0.05)
 sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=1.5e-4, total_steps=steps, pct_start=0.05)

@@ -236,7 +236,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
       <span class="field kind">판본<span class="seg"><label><input type="radio" name="kind" value="bang" checked>방각본</label><label><input type="radio" name="kind" value="pilsa">필사본</label></span></span>
       <label class="field">시작 쪽<input type="number" id="p0" min="1" value="1"></label>
       <label class="field">끝 쪽 (0 = 끝까지)<input type="number" id="p1" min="0" value="0"></label>
-      <label class="check lmonly"><input type="checkbox" id="lm" checked>언어 모델 보정</label>
+      <label class="check lmonly"><input type="checkbox" id="lm">언어 모델 보정(경판에 권함)</label>
       <button class="primary" id="go" disabled>판독 시작</button>
       <button id="stop" hidden>멈추기</button>
       <button id="trySample" type="button">예시 면으로 해 보기</button>
@@ -305,7 +305,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
     <div>
       <h3>어떻게 읽나</h3>
       <p>면에서 테두리선을 지우고 세로 행을 자동으로 나눈 뒤, 행마다 판독 모델이 글자를 읽습니다. 판독문은 <b>한 줄이 판본 한 행</b>이고 오른쪽 행부터 차례로 놓입니다.</p>
-      <p class="lmonly">판독할 때는 언어 모델 보정이 기본으로 켜져 있습니다. 언어 모델 보정은 국어 역사 자료 말뭉치 2023에 전사된 방각본 29종 47권으로 만든 자모 7-gram(자모가 이어지는 빈도표)으로 애매한 글자를 고릅니다.</p>
+      <p class="lmonly">언어 모델 보정은 기본으로 꺼져 있습니다. 켜면 국어 역사 자료 말뭉치 2023에 전사된 방각본 29종 47권으로 만든 자모 7-gram(자모가 이어지는 빈도표)으로 애매한 글자를 고릅니다. 이 자료가 거의 경판이라서 경판에서는 오류가 크게 줄지만, 완판처럼 표기가 다른 판본에서는 원문의 '천'을 '쳔'으로 바꾸는 식으로 오히려 표기를 경판 쪽으로 끌고 갑니다. 경판을 읽을 때만 켜세요.</p>
     </div>
     <div>
       <h3>정확도</h3>
@@ -802,7 +802,7 @@ const $ = (id)=>document.getElementById(id);
 const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, engs:{}, lmReady:null, kind:'bang' };
 const runLabel = ()=> (state.runKind==='pilsa' ? CFG.pilsa : CFG).modelLabel;
 const kindCfg = ()=> state.kind==='pilsa' ? CFG.pilsa : CFG;
-document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener('change',()=>{ state.kind=r.value; if (r.checked && r.value==='pilsa') $('lm').checked=false; else if (r.checked && CFG.lm) $('lm').checked=true; }));
+document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener('change',()=>{ state.kind=r.value; if (r.checked && r.value==='pilsa') $('lm').checked=false; }));
 
 // ---------- 엔진 내려받기 ----------
 async function fetchBytes(url, onBytes){

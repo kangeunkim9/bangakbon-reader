@@ -12,12 +12,12 @@ DEV = 'cuda' if torch.cuda.is_available() else 'cpu'
 PD = '/content/pilsa_lines_all'
 if not os.path.exists(PD + '/lines.jsonl'):
     os.makedirs(PD, exist_ok=True)
-    with zipfile.ZipFile(ROOT + '/aihub_pilsa/aihub_pilsa_lines_all.zip') as z: z.extractall(PD)
+    with zipfile.ZipFile(ROOT + '/3_AI허브_원본/aihub_pilsa/aihub_pilsa_lines_all.zip') as z: z.extractall(PD)
 R = [json.loads(l) for l in open(PD + '/lines.jsonl', encoding='utf-8')]
 N_TS = 321809   # ㉕ 셀 출력: TS_2 묶음이 먼저(321,809행), 그 뒤가 VS_2
 for i, r in enumerate(R): r['src'] = 'TS' if i < N_TS else 'VS'
 print('전체', len(R), '/ 앞 행 예:', {k: R[0][k] for k in R[0] if k != 'text'}, '/ 뒤 행 예:', {k: R[-1][k] for k in R[-1] if k != 'text'}, flush=True)
-m, cs = load_model(ROOT + '/gyeongpan_model_v10.pt', DEV)
+m, cs = load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', DEV)
 rnd = random.Random(7); out = {}
 def run(rows):
     pr = predict(m, cs, [PD + '/' + r['img'] for r in rows], DEV)
@@ -32,7 +32,7 @@ bk = collections.defaultdict(list)
 for e, p, r in out['TS']: bk[r['book']].append(e)
 worst = sorted(((np.mean(v), len(v), b) for b, v in bk.items() if len(v) >= 4), reverse=True)[:15]
 print('TS 책별 오류율(나쁜 순):', [(b, f'{a*100:.0f}%', n) for a, n, b in worst], flush=True)
-ED = ROOT + '/pilsa_check'; os.makedirs(ED, exist_ok=True)
+ED = ROOT + '/기록/pilsa_check'; os.makedirs(ED, exist_ok=True)
 with open(ED + '/check.tsv', 'w', encoding='utf-8') as f:
     f.write('no\t묶음\t오류율\t책\t사진\t정답\t10차판독\n')
     k = 0

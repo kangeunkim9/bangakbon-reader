@@ -13,7 +13,7 @@ from rapidfuzz.distance import Levenshtein as Lv
 from google.colab import drive; drive.mount('/content/drive')
 ROOT = '/content/drive/MyDrive/방각본_판독기'; DEV = 'cuda' if torch.cuda.is_available() else 'cpu'
 RAWG = 'https://raw.githubusercontent.com/kangeunkim9/bangakbon-reader/main/'
-SV = globals().get('SV_MODEL', ROOT + '/svtrv2_model_v2.pt')
+SV = globals().get('SV_MODEL', ROOT + '/1_모델/svtrv2_model_v2.pt')
 
 # ---------------- 1) 금향졍긔 권하를 사이트와 같은 방식으로 행 나누기 ----------------
 os.environ['BANGAKBON_NO_MAIN'] = '1'
@@ -28,7 +28,7 @@ for i in range(len(doc)):
 print('면', len(FACES), '행', sum(len(c) for _, c in FACES), flush=True)
 
 # ---------------- 2) 행마다 글자 확률표(log) 뽑기: 10차, SVTRv2 ----------------
-R10 = B['Reader'](ROOT + '/gyeongpan_model_v10.pt'); CH = list(R10.chars)
+R10 = B['Reader'](ROOT + '/1_모델/gyeongpan_model_v10.pt'); CH = list(R10.chars)
 LP = {'10차': [], 'SVTRv2': []}
 with torch.no_grad():
     for _, crops in FACES:
@@ -109,7 +109,7 @@ def beam(lp, alpha=0.3, beta=1.0, Bw=10):
 # ---------------- 4) 채점: 금향 KOHICO 전사와 통째로 맞춰 앞 절반(검증)·뒤 절반(시험) 오류를 따로 ----------------
 src10 = requests.get(RAWG + 'training/train_v10.py', timeout=60).text
 _fr = src10[src10.index('def fix_rep'):src10.index('def fix_group')]; exec(_fr)   # 반복 부호 정답 바로잡기(10차와 같게)
-KPG = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KPG = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for k, v in KPG.items() if k.startswith('금향정기_2')][0]
@@ -135,13 +135,13 @@ for name in ('10차', 'SVTRv2'):
     print(name, '끝', int(time.time() - t0), '초', flush=True)
 print('\n[금향졍긔 권하]  앞 절반(검증)  뒤 절반(시험)')
 for k, (v, t) in RES.items(): print(f'  {k:32s} {v:6.2f}%  {t:6.2f}%')
-json.dump(RES, open(ROOT + '/result_lm_svtrv2.json', 'w'), ensure_ascii=False, indent=1)
+json.dump(RES, open(ROOT + '/기록/result_lm_svtrv2.json', 'w'), ensure_ascii=False, indent=1)
 
 # ---------------- 5) SVTRv2 브라우저용 파일 (ONNX, 출력은 log 확률) ----------------
 class _Wrap(nn.Module):
     def __init__(s, m): super().__init__(); s.m = m
     def forward(s, x): return torch.log(s.m(x).clamp_min(1e-9))
-OUTD = ROOT + '/web_svtrv2'; os.makedirs(OUTD, exist_ok=True)
+OUTD = ROOT + '/1_모델/web_svtrv2'; os.makedirs(OUTD, exist_ok=True)
 svc = svm.cpu().float().eval()
 torch.onnx.export(_Wrap(svc), torch.randn(1, 3, SH, 640), OUTD + '/svtrv2.onnx', input_names=['x'], output_names=['y'],
                   dynamic_axes={'x': {0: 'b', 3: 'w'}, 'y': {0: 'b', 1: 't'}}, opset_version=17, dynamo=False)

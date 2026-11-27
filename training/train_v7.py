@@ -309,7 +309,7 @@ for _t in range(5):
 else:
     raise SystemExit('PDF를 내려받지 못했습니다. 잠시 후 다시 실행해 보세요.')
 pdf=_r.content; open('/content/wb.pdf','wb').write(pdf); print('PDF 크기',len(pdf)//1_000_000,'MB')
-D=json.load(open(ROOT+'/private/wolbong_gt.json',encoding='utf-8'))   # 월봉긔 사람 검수 정답(행 좌표·판독문). 저장소에는 넣지 않음
+D=json.load(open(ROOT+'/4_말뭉치_비공개/wolbong_gt.json',encoding='utf-8'))   # 월봉긔 사람 검수 정답(행 좌표·판독문). 저장소에는 넣지 않음
 doc=fitz.open('/content/wb.pdf'); os.makedirs('/content/data/lines',exist_ok=True)
 cache={}
 for lab,g in D['grid'].items():
@@ -324,8 +324,8 @@ for lab,g in D['grid'].items():
 print('행 이미지',len(os.listdir('/content/data/lines'))//2,'개 준비 완료')
 
 # ---------------- 2) 경판 원문 PDF 내려받기 ----------------
-KA=json.load(open(ROOT+'/private/kohico_kyeongpan.json',encoding='utf-8'))   # KOHICO 경판 전사(면 단위). 이용 조건상 저장소에 넣지 않음
-KG=json.load(open(ROOT+'/private/kohico_geumhyang.json',encoding='utf-8'))   # KOHICO 금향졍긔 전사(시험용). 저장소에 넣지 않음
+KA=json.load(open(ROOT+'/4_말뭉치_비공개/kohico_kyeongpan.json',encoding='utf-8'))   # KOHICO 경판 전사(면 단위). 이용 조건상 저장소에 넣지 않음
+KG=json.load(open(ROOT+'/4_말뭉치_비공개/kohico_geumhyang.json',encoding='utf-8'))   # KOHICO 금향졍긔 전사(시험용). 저장소에 넣지 않음
 SRC=[('ss1','File:CNTS-00082399741 1 샤시남졍긔.pdf','사씨남정기_상_경판32장본_1851_景印古小說板'),
      ('ss2','File:CNTS-00082399741 2 샤시남졍긔.pdf','사씨남정기_하_경판34장본_1851_景印古小說板'),
      ('sy1','File:CNTS-00082399892 1 셔유긔.pdf','서유기_상_경판31장본_1856_景印古小說板'),
@@ -347,7 +347,7 @@ for tag,title,wk in SRC+[('gh1','File:CNTS-00109637790 금향졍긔 이종. 권�
     try: get_pdf(title,f'/content/{tag}.pdf')
     except Exception as e: print('PDF 실패',tag,e)
 # ---------------- 3) 5차 모델로 읽고 KOHICO 전사에 맞춰 행 자료 만들기 ----------------
-with zipfile.ZipFile(ROOT+'/gyeongpan_model_v5.zip') as z: z.extract('gyeongpan_model_v5.pt','/content')
+with zipfile.ZipFile(ROOT+'/1_모델/gyeongpan_model_v5.zip') as z: z.extract('gyeongpan_model_v5.pt','/content')
 m5,cs5=load_model('/content/gyeongpan_model_v5.pt',DEV)
 OUTL='/content/data5/lines'; os.makedirs(OUTL,exist_ok=True)
 for tag,title,wk in SRC:
@@ -356,7 +356,7 @@ for tag,title,wk in SRC:
     for r in ok:
         fn=f"{OUTL}/{tag}_{r[3]}_{os.path.basename(r[0])[:-4]}"; shutil.copy(r[0],fn+'.png'); open(fn+'.gt.txt','w',encoding='utf-8').write(r[2]+'\n')
     print(f'{tag} {wk[:26]:26s} 정렬 {len(rows)}행 채택 {len(ok)}행',flush=True)
-shutil.make_archive('/content/gyeongpan_lines_v5align','zip','/content/data5'); shutil.copy('/content/gyeongpan_lines_v5align.zip',ROOT+'/gyeongpan_lines_v5align.zip')
+shutil.make_archive('/content/gyeongpan_lines_v5align','zip','/content/data5'); shutil.copy('/content/gyeongpan_lines_v5align.zip',ROOT+'/2_학습용_행자료/gyeongpan_lines_v5align.zip')
 # 금향졍긔 시험지 (뒤쪽 절반 면, 학습에 절대 쓰지 않음)
 rr=align_rows(read_pdf2('/content/gh1.pdf',m5,cs5,'gh2'),KG['1'])
 pgs=sorted({r[4] for r in rr}); te=[r for r in rr if r[4] in set(pgs[len(pgs)//2:])]
@@ -364,7 +364,7 @@ tp2=[r[0] for r in te]; tg2=[r[2] for r in te]
 print('금향졍긔 시험',len(te),'행 / 5차',f"{cer(predict(m5,cs5,tp2,DEV),tg2)*100:.1f}%",flush=True)
 # ---------------- 4) AI허브 목판본 행 자료 ----------------
 os.makedirs('/content/aihub_lines',exist_ok=True)
-with zipfile.ZipFile(ROOT+'/aihub/aihub_mokpan_lines.zip') as z: z.extractall('/content/aihub_lines')
+with zipfile.ZipFile(ROOT+'/3_AI허브_원본/aihub/aihub_mokpan_lines.zip') as z: z.extractall('/content/aihub_lines')
 AH=[json.loads(l) for l in open('/content/aihub_lines/lines.jsonl',encoding='utf-8')]
 AH=[(f"/content/aihub_lines/{r['img']}",r['text'],r['book']) for r in AH if len(G(r['text']))>=3 and os.path.exists(f"/content/aihub_lines/{r['img']}")]
 hold=lambda b: '심청전_04' in b or '춘향전' in b          # 완판으로 보이는 소설은 시험용으로 빼 둠
@@ -415,6 +415,6 @@ if AHte:
     r['novel_v5']=cer(predict(m5,cs5,[p for p,_ in sm],DEV),[t for _,t in sm]); r['novel_v7']=cer(predict(m7b,cs7b,[p for p,_ in sm],DEV),[t for _,t in sm])
 print('[처음 보는 작품] 금향졍긔 뒤쪽 절반  5차 %.1f%% → 7차 %.1f%%'%(r['gh_v5']*100,r['gh_v7']*100))
 if 'novel_v7' in r: print('[AI허브 소설(완판으로 보이는 것)]  5차 %.1f%% → 7차 %.1f%%'%(r['novel_v5']*100,r['novel_v7']*100))
-torch.save({'state':m7b.state_dict(),'chars':cs7b.chars,'H':H,'arch':'CRNN'},ROOT+'/gyeongpan_model_v7.pt')
-json.dump({'result':r,'log':log,'n_kyeong':len(KTR),'n_aihub':len(AHtr)},open(ROOT+'/result_v7.json','w'),ensure_ascii=False)
+torch.save({'state':m7b.state_dict(),'chars':cs7b.chars,'H':H,'arch':'CRNN'},ROOT+'/1_모델/gyeongpan_model_v7.pt')
+json.dump({'result':r,'log':log,'n_kyeong':len(KTR),'n_aihub':len(AHtr)},open(ROOT+'/기록/result_v7.json','w'),ensure_ascii=False)
 print('드라이브 저장 끝')

@@ -33,9 +33,9 @@ scaler = torch.cuda.amp.GradScaler(enabled=(AMP == torch.float16))
 
 # ---------------- 1) 중국어 SVTRv2 가중치 받기 ----------------
 CKURL = 'https://github.com/Topdu/OpenOCR/releases/download/develop0.0.1/openocr_svtrv2_ch.pth'
-SVCK = ROOT + '/svtrv2/openocr_svtrv2_ch.pth'
+SVCK = ROOT + '/1_모델/svtrv2/openocr_svtrv2_ch.pth'
 if not os.path.exists(SVCK):
-    os.makedirs(ROOT + '/svtrv2', exist_ok=True)
+    os.makedirs(ROOT + '/1_모델/svtrv2', exist_ok=True)
     with requests.get(CKURL, stream=True, timeout=120) as r:
         r.raise_for_status()
         with open('/content/sv.pth', 'wb') as f:
@@ -43,7 +43,7 @@ if not os.path.exists(SVCK):
     shutil.copy('/content/sv.pth', SVCK)
 
 # ---------------- 2) 글자표를 옛한글 자모로 바꾼 모델 ----------------
-CH = list(load_model(ROOT + '/gyeongpan_model_v10.pt', 'cpu')[1].chars)   # 10차와 같은 자모 222종, 0번은 공백 기호
+CH = list(load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', 'cpu')[1].chars)   # 10차와 같은 자모 222종, 0번은 공백 기호
 IDX = {c: i + 1 for i, c in enumerate(CH)}
 arch = yaml.safe_load(open('/content/openocr/configs/rec/svtrv2/svtrv2_ch.yml'))['Architecture']
 arch['Decoder']['out_channels'] = len(CH) + 1
@@ -54,7 +54,7 @@ own = svm.state_dict(); keep = 0
 for k, v in sd.items():
     if k in own and own[k].shape == v.shape: own[k] = v; keep += 1
 svm.load_state_dict(own); svm = svm.to(DEV)
-# 셀에서 SV_TAG='v2'; SV_EP=16; SV_INIT=ROOT+'/svtrv2_model_v1.pt' 처럼 주면 앞 결과에서 이어 더 길게 배운다
+# 셀에서 SV_TAG='v2'; SV_EP=16; SV_INIT=ROOT+'/1_모델/svtrv2_model_v1.pt' 처럼 주면 앞 결과에서 이어 더 길게 배운다
 SV_TAG = globals().get('SV_TAG', 'v1'); SV_EP = globals().get('SV_EP', 8); SV_INIT = globals().get('SV_INIT')
 if SV_INIT:
     svm.load_state_dict(torch.load(SV_INIT, map_location=DEV, weights_only=False)['state']); print('이어서 출발:', SV_INIT, flush=True)
@@ -123,7 +123,7 @@ pg = [{'params': [p for n, p in svm.named_parameters() if n in NEW], 'lr': 1e-3}
 opt = torch.optim.AdamW(pg, weight_decay=0.05)
 sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=[1e-3, 2e-4], total_steps=steps, pct_start=0.05)
 ctc = nn.CTCLoss(blank=0, zero_infinity=True)
-CKP = ROOT + f'/ckpt_svtrv2_{SV_TAG}.pt' if SV_TAG != 'v1' else ROOT + '/ckpt_svtrv2.pt'; SAVES = ROOT + f'/svtrv2_model_{SV_TAG}.pt'; ep0 = 1; best = None; logs = []
+CKP = ROOT + f'/1_모델/ckpt_svtrv2_{SV_TAG}.pt' if SV_TAG != 'v1' else ROOT + '/1_모델/ckpt_svtrv2.pt'; SAVES = ROOT + f'/1_모델/svtrv2_model_{SV_TAG}.pt'; ep0 = 1; best = None; logs = []
 if os.path.exists(CKP):
     c0 = torch.load(CKP, map_location=DEV, weights_only=False)
     if c0.get('per') == per and c0.get('chars') == CH:
@@ -153,7 +153,7 @@ for ep in range(ep0, EP + 1):
 
 # ---------------- 5) 시험: 10차와 나란히 ----------------
 svm.load_state_dict(torch.load(SAVES, map_location=DEV, weights_only=False)['state'])
-m10, cs10 = load_model(ROOT + '/gyeongpan_model_v10.pt', DEV)
+m10, cs10 = load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', DEV)
 R = {}
 R['val_v10'] = cer(predict(m10, cs10, [p for p, _ in KVA], DEV), [t for _, t in KVA]); R['pilsa_v10'] = cer(predict(m10, cs10, [p for p, _ in PSV], DEV), [t for _, t in PSV])
 R['val_s'], R['pilsa_s'] = val_s(svm)
@@ -162,7 +162,7 @@ R['simcheong_v10'] = cer(predict(m10, cs10, [p for p, _ in sm], DEV), [t for _, 
 from rapidfuzz.distance import Levenshtein as Lv
 os.environ['BANGAKBON_NO_MAIN'] = '1'
 B = {'__name__': 'bulk'}; exec(requests.get(RAW + 'bulk_ocr.py', timeout=60).text, B)
-KPG = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KPG = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for k, v in KPG.items() if k.startswith('금향정기_2')][0]
@@ -181,11 +181,11 @@ def geum(read_face):
     for op in Lv.editops(flat, GT):
         p = min(op.src_pos, len(own_) - 1); err[own_[p] >= 36] += 1
     return err[True] / nn_[True]
-R10 = B['Reader'](ROOT + '/gyeongpan_model_v10.pt')
+R10 = B['Reader'](ROOT + '/1_모델/gyeongpan_model_v10.pt')
 R['geum_v10'] = geum(lambda crops: [s for s, _ in R10.read([B['prep_arr'](c) for c in crops], bs=1)])
 R['geum_s'] = geum(lambda crops: read_s(svm, crops))
 print(f"\n[금향졍긔 뒤쪽 절반]  10차 {R['geum_v10']*100:.2f}%  SVTRv2 {R['geum_s']*100:.2f}%  (언어 모델 없이)")
 print(f"[경판 검증]          10차 {R['val_v10']*100:.2f}%  SVTRv2 {R['val_s']*100:.2f}%")
 print(f"[필사본 시험 행]      10차 {R['pilsa_v10']*100:.2f}%  SVTRv2 {R['pilsa_s']*100:.2f}%")
 print(f"[AI허브 심청전_04]   10차 {R['simcheong_v10']*100:.2f}%  SVTRv2 {R['simcheong_s']*100:.2f}%")
-json.dump({'result': R, 'log': logs}, open(ROOT + f'/result_svtrv2_{SV_TAG}.json', 'w'), ensure_ascii=False)
+json.dump({'result': R, 'log': logs}, open(ROOT + f'/기록/result_svtrv2_{SV_TAG}.json', 'w'), ensure_ascii=False)

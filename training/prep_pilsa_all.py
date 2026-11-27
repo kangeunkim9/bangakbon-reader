@@ -5,9 +5,9 @@ src = requests.get('https://raw.githubusercontent.com/kangeunkim9/bangakbon-read
 G_ = {'__name__': 'prep'}; exec(src, G_)
 from google.colab import drive; drive.mount('/content/drive')
 R = '/content/drive/MyDrive/방각본_판독기'
-G_['WORK'] = W = '/content/pilsa_all'; G_['OUT'] = '/content/pilsa_lines_all'; G_['SRC'] = R + '/aihub_pilsa'
+G_['WORK'] = W = '/content/pilsa_all'; G_['OUT'] = '/content/pilsa_lines_all'; G_['SRC'] = R + '/3_AI허브_원본/aihub_pilsa'
 os.makedirs(W, exist_ok=True); os.makedirs(G_['OUT'], exist_ok=True)
-for tf in (R + '/aihub_pilsa/download.tar', R + '/aihub_pilsa_ts/TS_2.tar'):
+for tf in (R + '/3_AI허브_원본/aihub_pilsa/download.tar', R + '/3_AI허브_원본/aihub_pilsa_ts/TS_2.tar'):
     tag = W + '/.' + os.path.basename(tf) + '.done'
     if os.path.exists(tag): continue
     print('푸는 중:', tf, flush=True)
@@ -18,5 +18,5 @@ rows = G_['build']()
 c = collections.Counter(r['book'].split('_')[3] if r['book'].count('_') >= 3 else r['book'] for r in rows)
 print('작품 수', len(c), '/ 행', len(rows)); print('작품별 행 수(앞부분):', c.most_common(30))
 shutil.make_archive('/content/pilsa_lines_all', 'zip', G_['OUT'])
-shutil.copy('/content/pilsa_lines_all.zip', R + '/aihub_pilsa/aihub_pilsa_lines_all.zip')
+shutil.copy('/content/pilsa_lines_all.zip', R + '/3_AI허브_원본/aihub_pilsa/aihub_pilsa_lines_all.zip')
 print('드라이브 저장 끝:', f"{os.path.getsize('/content/pilsa_lines_all.zip')/1e9:.1f}GB")

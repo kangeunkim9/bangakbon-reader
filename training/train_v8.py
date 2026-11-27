@@ -31,7 +31,7 @@ for ep in range(1,EP+1):
         tot+=loss.item(); n+=1
     c=cer(predict(m8,cs8,[p for p,_ in KVA],DEV),[t for _,t in KVA]); log8.append((ep,tot/n,c))
     if c<best:
-        best=c; torch.save({'state':m8.state_dict(),'chars':cs8.chars,'H':H},SAVE8); shutil.copy(SAVE8,ROOT+'/gyeongpan_model_v8_진행중.pt')
+        best=c; torch.save({'state':m8.state_dict(),'chars':cs8.chars,'H':H},SAVE8); shutil.copy(SAVE8,ROOT+'/1_모델/gyeongpan_model_v8_진행중.pt')
     print(f'epoch {ep:2d}  loss {tot/n:.3f}  경판 검증 {c*100:.1f}% (최고 {best*100:.1f}%)  {time.time()-t0:.0f}s',flush=True)
 m8b,cs8b=load_model(SAVE8,DEV)
 r8={'gh_v7':cer(predict(m7b,cs7b,tp2,DEV),tg2),'gh_v8':cer(predict(m8b,cs8b,tp2,DEV),tg2)}
@@ -39,11 +39,11 @@ sm=random.Random(1).sample(AH8te,min(800,len(AH8te)))
 r8['novel_v7']=cer(predict(m7b,cs7b,[p for p,_ in sm],DEV),[t for _,t in sm]); r8['novel_v8']=cer(predict(m8b,cs8b,[p for p,_ in sm],DEV),[t for _,t in sm])
 print('[처음 보는 작품] 금향졍긔 뒤쪽 절반  7차 %.1f%% → 8차 %.1f%%'%(r8['gh_v7']*100,r8['gh_v8']*100))
 print('[AI허브 소설]  7차 %.1f%% → 8차 %.1f%%'%(r8['novel_v7']*100,r8['novel_v8']*100))
-torch.save({'state':m8b.state_dict(),'chars':cs8b.chars,'H':H,'arch':'CRNN'},ROOT+'/gyeongpan_model_v8.pt')
-json.dump({'result':r8,'log':log8,'n_kyeong':len(KTR),'n_aihub':len(AH8tr)},open(ROOT+'/result_v8.json','w'),ensure_ascii=False)
+torch.save({'state':m8b.state_dict(),'chars':cs8b.chars,'H':H,'arch':'CRNN'},ROOT+'/1_모델/gyeongpan_model_v8.pt')
+json.dump({'result':r8,'log':log8,'n_kyeong':len(KTR),'n_aihub':len(AH8tr)},open(ROOT+'/기록/result_v8.json','w'),ensure_ascii=False)
 # 웹용 내보내기 (9MB 조각)
 import onnxruntime as ort
-OUTW=ROOT+'/web_v8'; os.makedirs(OUTW,exist_ok=True)
+OUTW=ROOT+'/1_모델/web_v8'; os.makedirs(OUTW,exist_ok=True)
 mm=m8b.cpu().eval(); kw=dict(input_names=['x'],output_names=['y'],dynamic_axes={'x':{3:'w'},'y':{1:'t'}},opset_version=17)
 try: torch.onnx.export(mm,torch.zeros(1,1,64,800),'/content/m8.onnx',dynamo=False,**kw)
 except TypeError: torch.onnx.export(mm,torch.zeros(1,1,64,800),'/content/m8.onnx',**kw)

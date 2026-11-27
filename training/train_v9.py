@@ -20,14 +20,14 @@ get = lambda f: requests.get(RAW + f, timeout=60).text
 # ---------------- 0) 7차의 공통 코드(모델·행 나누기)와 월봉긔 검수 정답 ----------------
 src7 = get('train_v7.py')
 exec(src7[:src7.index('# ---------------- 1)')], globals())   # 공통 코드(모델·행 나누기)
-if os.path.exists(ROOT + '/private/wolbong_gt.json'):              # 월봉긔 사람 검수 정답이 드라이브에 있으면 행 자료를 새로 만든다
+if os.path.exists(ROOT + '/4_말뭉치_비공개/wolbong_gt.json'):              # 월봉긔 사람 검수 정답이 드라이브에 있으면 행 자료를 새로 만든다
     exec(src7[src7.index('# ---------------- 1)'):src7.index('# ---------------- 2)')], globals())
 elif not os.path.isdir('/content/data/lines'):
     print('월봉긔 검수 정답이 없어 이번에는 빼고 학습한다', flush=True); os.makedirs('/content/data/lines', exist_ok=True)
 exec(get('aug_invert.py'), globals())                                                       # invert_span
 
 # ---------------- 1) 경판 행 자료(7차 때 만든 것)와 검증 면 나누기(7차와 똑같이) ----------------
-with zipfile.ZipFile(ROOT + '/gyeongpan_lines_v5align.zip') as z: z.extractall('/content/data5')
+with zipfile.ZipFile(ROOT + '/2_학습용_행자료/gyeongpan_lines_v5align.zip') as z: z.extractall('/content/data5')
 OUTL = '/content/data5/lines'
 P5 = {'wb': load_pairs('/content/data/lines')}
 for p, t in load_pairs(OUTL): P5.setdefault(os.path.basename(p).split('_')[0], []).append((p, t))
@@ -43,7 +43,7 @@ print('경판 학습', len(KTR), '행 / 검증', len(KVA), '행', flush=True)
 
 # ---------------- 2) 판독기에서 고쳐 보낸 면 → 행 자료 ----------------
 INB = '/content/inbox_lines'; os.makedirs(INB, exist_ok=True); INTR = []; nf = 0
-for js in sorted(glob.glob(ROOT + '/학습자료/*/*.json')):
+for js in sorted(glob.glob(ROOT + '/7_보내준_면/*/*.json')):
     try:
         d = json.load(open(js, encoding='utf-8'))
         if '금향' in unicodedata.normalize('NFC', str(d.get('src', '')) + str(d.get('commons', ''))): continue   # 시험 책
@@ -64,7 +64,7 @@ print('고쳐 보낸 면', nf, '면 →', len(INTR), '행', flush=True)
 
 # ---------------- 3) AI허브 목판본: 춘향전은 학습으로, 심청전_04만 시험 ----------------
 os.makedirs('/content/aihub_lines', exist_ok=True)
-AHZ = ROOT + '/aihub/aihub_mokpan_lines_v9.zip' if os.path.exists(ROOT + '/aihub/aihub_mokpan_lines_v9.zip') else ROOT + '/aihub/aihub_mokpan_lines.zip'
+AHZ = ROOT + '/3_AI허브_원본/aihub/aihub_mokpan_lines_v9.zip' if os.path.exists(ROOT + '/3_AI허브_원본/aihub/aihub_mokpan_lines_v9.zip') else ROOT + '/3_AI허브_원본/aihub/aihub_mokpan_lines.zip'
 with zipfile.ZipFile(AHZ) as z: z.extractall('/content/aihub_lines')
 AH = [json.loads(l) for l in open('/content/aihub_lines/lines.jsonl', encoding='utf-8')]
 AH = [(f"/content/aihub_lines/{r['img']}", r['text'], r['book']) for r in AH if len(G(r['text'])) >= 3 and os.path.exists(f"/content/aihub_lines/{r['img']}")]
@@ -73,7 +73,7 @@ AHtr = [(p, t) for p, t, b in AH if not hold9(b)]; AHte = [(p, t) for p, t, b in
 print('AI허브 학습', len(AHtr), '행 / 시험(심청전_04)', len(AHte), '행', flush=True)
 # AI허브 필사본(행 자료는 ㉑ 셀이 만든 aihub_pilsa_lines.zip). 유이양문록 전부와 명행정의록 권8은 시험용으로 뺀다.
 PS_tr, PS_te = [], []
-PZ = ROOT + '/aihub_pilsa/aihub_pilsa_lines.zip'
+PZ = ROOT + '/3_AI허브_원본/aihub_pilsa/aihub_pilsa_lines.zip'
 if os.path.exists(PZ):
     os.makedirs('/content/pilsa_lines', exist_ok=True)
     with zipfile.ZipFile(PZ) as z: z.extractall('/content/pilsa_lines')
@@ -118,7 +118,7 @@ class LineDS9(torch.utils.data.Dataset):
     def __getitem__(s, i): p, t = s.p[i]; return prep9(p, s.aug), s.cs.encode(t)
 
 # ---------------- 5) 8차 가중치에서 시작 ----------------
-m8, cs8 = load_model(ROOT + '/gyeongpan_model_v8.pt', DEV)
+m8, cs8 = load_model(ROOT + '/1_모델/gyeongpan_model_v8.pt', DEV)
 cs9 = Charset(list(cs8.chars) + [t for _, t in INTR + PS_tr + PS_te])
 print('자모', len(cs8.chars), '→', len(cs9.chars), '종', flush=True)
 random.seed(0); torch.manual_seed(0)
@@ -140,13 +140,13 @@ def val_score(m, cs):
     k = cer(predict(m, cs, [p for p, _ in KVA], DEV), [t for _, t in KVA])
     q = cer(predict(m, cs, [p for p, _ in PSV], DEV), [t for _, t in PSV]) if PSV else 0.0
     return k, q
-CK = ROOT + '/ckpt_v9.pt'; SAVE9 = '/content/gyeongpan_model_v9.pt'; ep0 = 1; best9 = None; log9 = []
+CK = ROOT + '/1_모델/ckpt_v9.pt'; SAVE9 = '/content/gyeongpan_model_v9.pt'; ep0 = 1; best9 = None; log9 = []
 if os.path.exists(CK):
     ck = torch.load(CK, map_location=DEV)
     if ck.get('chars') == cs9.chars and ck.get('per') == per:
         m9.load_state_dict(ck['state']); opt.load_state_dict(ck['opt']); sch.load_state_dict(ck['sch'])
         ep0 = ck['ep'] + 1; best9 = ck['best9']; log9 = ck['log']; print('이어서 학습:', ep0, '에폭부터', flush=True)
-        if os.path.exists(ROOT + '/gyeongpan_model_v9_진행중.pt'): shutil.copy(ROOT + '/gyeongpan_model_v9_진행중.pt', SAVE9)
+        if os.path.exists(ROOT + '/1_모델/gyeongpan_model_v9_진행중.pt'): shutil.copy(ROOT + '/1_모델/gyeongpan_model_v9_진행중.pt', SAVE9)
 q8 = val_score(m8, cs8)[1]; print(f'8차 필사본 시험 행 {q8*100:.2f}%', flush=True)
 for ep in range(ep0, EP + 1):
     tr = KTR + INTR * REP_IN + random.sample(AHtr, NAH) + PS_tr
@@ -160,11 +160,11 @@ for ep in range(ep0, EP + 1):
         tot += loss.item(); n += 1
     k, q = val_score(m9, cs9); sc = k + q; log9.append((ep, tot / n, k, q))
     if best9 is None or sc < best9:
-        best9 = sc; torch.save({'state': m9.state_dict(), 'chars': cs9.chars, 'H': H}, SAVE9); shutil.copy(SAVE9, ROOT + '/gyeongpan_model_v9_진행중.pt')
+        best9 = sc; torch.save({'state': m9.state_dict(), 'chars': cs9.chars, 'H': H}, SAVE9); shutil.copy(SAVE9, ROOT + '/1_모델/gyeongpan_model_v9_진행중.pt')
     torch.save({'state': m9.state_dict(), 'opt': opt.state_dict(), 'sch': sch.state_dict(), 'ep': ep, 'best9': best9, 'log': log9, 'chars': cs9.chars, 'per': per}, CK)
     print(f'epoch {ep:2d}  loss {tot/n:.3f}  경판 검증 {k*100:.2f}% (8차 {c8*100:.2f}%)  필사본 {q*100:.2f}% (8차 {q8*100:.2f}%)  {time.time()-t0:.0f}s', flush=True)
 m9b, cs9b = load_model(SAVE9, DEV)
-torch.save({'state': m9b.state_dict(), 'chars': cs9b.chars, 'H': H, 'arch': 'CRNN'}, ROOT + '/gyeongpan_model_v9.pt')
+torch.save({'state': m9b.state_dict(), 'chars': cs9b.chars, 'H': H, 'arch': 'CRNN'}, ROOT + '/1_모델/gyeongpan_model_v9.pt')
 
 # ---------------- 7) 시험 ----------------
 from rapidfuzz.distance import Levenshtein as Lv
@@ -175,7 +175,7 @@ R9['simcheong_v9'] = cer(predict(m9b, cs9b, [p for p, _ in sm], DEV), [t for _, 
 # 금향졍긔 권하: 면을 통째로 읽어 KOHICO 전사와 맞춤 (대량 판독과 같은 행 나누기)
 os.environ['BANGAKBON_NO_MAIN'] = '1'
 B = {'__name__': 'bulk'}; exec(get('bulk_ocr.py'), B)
-KP = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KP = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for k, v in KP.items() if k.startswith('금향정기_2')][0]
@@ -194,16 +194,16 @@ def geum(path):
     for op in Lv.editops(flat, GT):
         p = min(op.src_pos, len(own) - 1); err[own[p] >= 36] += 1
     return err[True] / n[True]
-R9['geum_v8'] = geum(ROOT + '/gyeongpan_model_v8.pt'); R9['geum_v9'] = geum(ROOT + '/gyeongpan_model_v9.pt')
+R9['geum_v8'] = geum(ROOT + '/1_모델/gyeongpan_model_v8.pt'); R9['geum_v9'] = geum(ROOT + '/1_모델/gyeongpan_model_v9.pt')
 print(f"\n[경판 검증]          8차 {R9['val_v8']*100:.2f}% → 9차 {R9['val_v9']*100:.2f}%")
 print(f"[금향졍긔 뒤쪽 절반]  8차 {R9['geum_v8']*100:.2f}% → 9차 {R9['geum_v9']*100:.2f}%  (언어 모델 없이)")
 print(f"[필사본 시험 행]      8차 {R9['pilsa_v8']*100:.2f}% → 9차 {R9['pilsa_v9']*100:.2f}%")
 print(f"[AI허브 심청전_04]   8차 {R9['simcheong_v8']*100:.2f}% → 9차 {R9['simcheong_v9']*100:.2f}%")
-json.dump({'result': R9, 'log': log9, 'n_kyeong': len(KTR), 'n_inbox': len(INTR), 'n_aihub': len(AHtr), 'n_pilsa': len(PS_tr)}, open(ROOT + '/result_v9.json', 'w'), ensure_ascii=False)
+json.dump({'result': R9, 'log': log9, 'n_kyeong': len(KTR), 'n_inbox': len(INTR), 'n_aihub': len(AHtr), 'n_pilsa': len(PS_tr)}, open(ROOT + '/기록/result_v9.json', 'w'), ensure_ascii=False)
 
 # ---------------- 8) 웹용 내보내기 (배치 축도 가변, 9MB 조각) ----------------
 import onnxruntime as ort
-OUTW = ROOT + '/web_v9'; os.makedirs(OUTW, exist_ok=True)
+OUTW = ROOT + '/1_모델/web_v9'; os.makedirs(OUTW, exist_ok=True)
 mm = m9b.cpu().eval(); kw = dict(input_names=['x'], output_names=['y'], dynamic_axes={'x': {0: 'b', 3: 'w'}, 'y': {0: 'b', 1: 't'}}, opset_version=17)
 try: torch.onnx.export(mm, torch.zeros(2, 1, 64, 800), '/content/m9.onnx', dynamo=False, **kw)
 except TypeError: torch.onnx.export(mm, torch.zeros(2, 1, 64, 800), '/content/m9.onnx', **kw)

@@ -9,7 +9,7 @@
 import os, re, json, random, zipfile, time
 os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')   # 메모리 조각남 줄이기(런타임 새로 시작했을 때만 먹힘)
 SV_TAG = 'p1'; SV_EP = globals().get('SV_EP', 6)
-SV_INIT = '/content/drive/MyDrive/방각본_판독기/svtrv2_model_v2.pt'
+SV_INIT = '/content/drive/MyDrive/방각본_판독기/1_모델/svtrv2_model_v2.pt'
 import requests
 RAW = 'https://raw.githubusercontent.com/kangeunkim9/bangakbon-reader/main/training/'
 _src = requests.get(RAW + 'train_svtrv2.py', timeout=60).text
@@ -19,7 +19,7 @@ exec(_src[:_src.index('\n# ---------------- 4) 학습')], globals())        # 1)
 PD = '/content/pilsa_lines_all'
 if not os.path.exists(PD + '/lines.jsonl'):
     os.makedirs(PD, exist_ok=True); t0 = time.time()
-    with zipfile.ZipFile(ROOT + '/aihub_pilsa/aihub_pilsa_lines_all.zip') as z: z.extractall(PD)
+    with zipfile.ZipFile(ROOT + '/3_AI허브_원본/aihub_pilsa/aihub_pilsa_lines_all.zip') as z: z.extractall(PD)
     print('필사본 전체 풀기', int(time.time() - t0), '초', flush=True)
 fixt = lambda s: nfc(nfd(s).replace('ᅌ', 'ᄋ'))      # 옛이응 → 이응
 HOLD = re.compile(r'유이양문록|명행정의록8_|경주최씨댁한글편지')
@@ -36,7 +36,7 @@ PS_te = [(p, fixt(t)) for p, t in PS_te]; PSV = random.Random(2).sample(PS_te, m
 EGV = random.Random(3).sample(EG_te, min(600, len(EG_te)))
 
 # ---------------- 3) 정답 점검: 지금 모델과 너무 다른 행 빼기 ----------------
-FILT = ROOT + '/pilsa_all_filter_v2.json'
+FILT = ROOT + '/2_학습용_행자료/pilsa_all_filter_v2.json'
 if os.path.exists(FILT):
     keep = set(json.load(open(FILT)))
 else:
@@ -65,7 +65,23 @@ else:
     json.dump(keep, open(FILT, 'w'))
     if os.path.exists(PART): os.remove(PART)
     print('정답 점검으로 뺀 비율이 높은 책:', sorted(((bad[b] / seen[b], seen[b], b) for b in seen if seen[b] >= 50), reverse=True)[:10], flush=True)
-PALL = [(ALL[i][0], ALL[i][1]) for i in sorted(keep)]
+# 8_검증용_작품에 들어 있는 작품은 학습에서 뺀다. 폴더 이름이 '작품명_소장처'든 '작품명_판종_소장처'든 맨 앞을 작품명으로 읽는다.
+# (정답 점검 결과 keep은 ALL의 순서에 묶여 있으므로 ALL은 그대로 두고 여기서 거른다)
+def _val_works():
+    vd = [os.path.join(ROOT, d) for d in os.listdir(ROOT) if nfc(d).startswith('8_')]
+    w = set()
+    for dp, dn, fn in (os.walk(vd[0]) if vd else []):
+        if nfc(os.path.basename(dp)) == '원문': continue
+        for d in dn:
+            if '_' in d: w.add(re.sub(r'\(.*?\)', '', nfc(d).split('_')[0]).strip())
+    return w
+def _book_work(b):
+    m = re.match(r'(?:필사본|목판본)_\d+_[^_]+_(.+?)(?:_\d+)?$', nfc(b))
+    return re.sub(r'\d+$', '', m.group(1) if m else nfc(b))
+VWORKS = _val_works()
+EXV = {i for i in keep if _book_work(ALL[i][2]) in VWORKS}
+print('검증용 작품과 같은 작품이라 학습에서 뺀 행', len(EXV), sorted({_book_work(ALL[i][2]) for i in EXV}), flush=True)
+PALL = [(ALL[i][0], ALL[i][1]) for i in sorted(keep) if i not in EXV]
 print('정답 점검 통과', len(PALL), '/', len(ALL), '행', flush=True)
 
 def val_s(m):
@@ -81,7 +97,7 @@ per = len(KTR) + REP_IN * len(INTR) + NAH + NPS; steps = EP * (per // BS)
 opt = torch.optim.AdamW(svm.parameters(), lr=1.5e-4, weight_decay=0.05)
 sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=1.5e-4, total_steps=steps, pct_start=0.05)
 ctc = nn.CTCLoss(blank=0, zero_infinity=True)
-CKP = ROOT + f'/ckpt_svtrv2_{SV_TAG}.pt'; SAVES = ROOT + f'/svtrv2_model_{SV_TAG}.pt'; ep0 = 1; best = None; logs = []
+CKP = ROOT + f'/1_모델/ckpt_svtrv2_{SV_TAG}.pt'; SAVES = ROOT + f'/1_모델/svtrv2_model_{SV_TAG}.pt'; ep0 = 1; best = None; logs = []
 if os.path.exists(CKP):
     c0 = torch.load(CKP, map_location=DEV, weights_only=False)
     if c0.get('per') == per and c0.get('chars') == CH:
@@ -120,7 +136,7 @@ k, q, e = val_s(svm)
 from rapidfuzz.distance import Levenshtein as Lv
 os.environ['BANGAKBON_NO_MAIN'] = '1'
 B = {'__name__': 'bulk'}; exec(requests.get(RAW + 'bulk_ocr.py', timeout=60).text, B)
-KPG = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KPG = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for kk, v in KPG.items() if kk.startswith('금향정기_2')][0]
@@ -146,4 +162,4 @@ svm.load_state_dict(torch.load(SV_INIT, map_location=DEV, weights_only=False)['s
 R['v2']['심청전'] = cer(read_s(svm, [p for p, _ in sm]), [t for _, t in sm]); R['v2']['금향'] = geum(lambda crops: read_s(svm, crops))
 print('\n[언어 모델 없이 글자 오류율]   지금 사이트(v2)   필사본 더 배움(p1)')
 for kk in ('경판 검증', '금향', '심청전', '필사본', '언간'): print(f'  {kk:8s} {R["v2"][kk]*100:8.2f}%  {R["p1"][kk]*100:8.2f}%')
-json.dump({'result': R, 'log': logs, 'n_pilsa': len(PALL), 'n_pilsa_all': len(ALL)}, open(ROOT + f'/result_svtrv2_{SV_TAG}.json', 'w'), ensure_ascii=False)
+json.dump({'result': R, 'log': logs, 'n_pilsa': len(PALL), 'n_pilsa_all': len(ALL)}, open(ROOT + f'/기록/result_svtrv2_{SV_TAG}.json', 'w'), ensure_ascii=False)

@@ -31,7 +31,7 @@ src10 = requests.get(RAW + 'train_v10.py', timeout=60).text
 exec(src10[:src10.index('# ---------------- 4)')], globals())     # 10차와 같은 학습 자료
 
 import yaml, copy, multiprocessing as mp
-CH = list(load_model(ROOT + '/gyeongpan_model_v10.pt', 'cpu')[1].chars)   # 10차와 같은 자모 222종
+CH = list(load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', 'cpu')[1].chars)   # 10차와 같은 자모 222종
 CHS = set(CH); MAXL = 100; PW = 1280        # 행 하나에 자모 100개까지, 높이 48에 너비 1280까지
 lab = lambda t: ''.join(c for c in nfd(t) if c in CHS)
 
@@ -62,7 +62,7 @@ print('학습 목록', len(TR), '행', flush=True)
 # ---------------- 2) 설정: PP-OCRv5 server 인식 모델 + 중국어 등 학습 가중치에서 출발 ----------------
 BS = 32; EP = 2
 cfg = yaml.safe_load(open(PP + '/configs/rec/PP-OCRv5/PP-OCRv5_server_rec.yml'))
-OUT = ROOT + '/ppocrv5_out'
+OUT = ROOT + '/1_모델/ppocrv5_out'
 cfg['Global'].update(epoch_num=EP, use_gpu=True, distributed=False, character_dict_path=D + '/dict.txt', max_text_length=MAXL,
                      use_space_char=False, save_model_dir=OUT, save_epoch_step=1, print_batch_step=200, use_amp=True, amp_level='O1',
                      eval_batch_step=[0, len(TR) // BS // 2], cal_metric_during_train=False, d2s_train_image_shape=[3, 48, PW],
@@ -134,7 +134,7 @@ def read_pp_many(groups):          # groups: 이름 -> 그림 목록. 한 번에
     for k, s_ in zip(names, pred): out[k].append(nfc(s_))
     return out
 PSV = random.Random(2).sample(PS_te, min(600, len(PS_te)))
-m10, cs10 = load_model(ROOT + '/gyeongpan_model_v10.pt', DEV)
+m10, cs10 = load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', DEV)
 R = {}
 sm = random.Random(1).sample(AHte, min(800, len(AHte)))
 R['val_v10'] = cer(predict(m10, cs10, [p for p, _ in KVA], DEV), [t for _, t in KVA])
@@ -143,7 +143,7 @@ R['simcheong_v10'] = cer(predict(m10, cs10, [p for p, _ in sm], DEV), [t for _, 
 from rapidfuzz.distance import Levenshtein as Lv
 os.environ['BANGAKBON_NO_MAIN'] = '1'
 B = {'__name__': 'bulk'}; exec(requests.get(RAW + 'bulk_ocr.py', timeout=60).text, B)
-KPG = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KPG = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for k, v in KPG.items() if k.startswith('금향정기_2')][0]
@@ -164,7 +164,7 @@ def geum_from(lines_per_face):
     for op in Lv.editops(flat, GT):
         p = min(op.src_pos, len(own_) - 1); err[own_[p] >= 36] += 1
     return err[True] / nn_[True]
-R10 = B['Reader'](ROOT + '/gyeongpan_model_v10.pt')
+R10 = B['Reader'](ROOT + '/1_모델/gyeongpan_model_v10.pt')
 R['geum_v10'] = geum_from([[s_ for s_, _ in R10.read([B['prep_arr'](c) for c in crops], bs=1)] for _, crops in FACES])
 G = {'val': [p for p, _ in KVA], 'pilsa': [p for p, _ in PSV], 'sim': [p for p, _ in sm]}
 for j, (_, crops) in enumerate(FACES): G[f'g{j}'] = crops
@@ -175,4 +175,4 @@ print(f"\n[금향졍긔 뒤쪽 절반]  10차 {R['geum_v10']*100:.2f}%  PP-OCRv5
 print(f"[경판 검증]          10차 {R['val_v10']*100:.2f}%  PP-OCRv5 {R['val_pp']*100:.2f}%")
 print(f"[필사본 시험 행]      10차 {R['pilsa_v10']*100:.2f}%  PP-OCRv5 {R['pilsa_pp']*100:.2f}%")
 print(f"[AI허브 심청전_04]   10차 {R['simcheong_v10']*100:.2f}%  PP-OCRv5 {R['simcheong_pp']*100:.2f}%")
-json.dump({'result': R, 'weights': WGT}, open(ROOT + '/result_ppocrv5_v1.json', 'w'), ensure_ascii=False)
+json.dump({'result': R, 'weights': WGT}, open(ROOT + '/기록/result_ppocrv5_v1.json', 'w'), ensure_ascii=False)

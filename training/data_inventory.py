@@ -41,7 +41,7 @@ for b in sorted(allc): ROWS.append(('AI허브 옛한글 OCR(필사본, 전체)',
 ROWS.append(('AI허브 옛한글 OCR(필사본, 전체)', '필사본', '유이양문록·명행정의록 권8', 0, len(G['PS_te']), '시험용'))
 ROWS.append(('AI허브 옛한글 OCR(필사본, 전체)', '언간', '경주최씨댁한글편지', 0, len(G['EG_te']), '시험용(언간, 보고에서는 뺌)'))
 ROWS.append(('위키미디어 공용(국립중앙도서관 원문)', '경판', '금향졍긔 권하', 0, 0, '시험용(행 단위가 아니라 면 통째로 채점)'))
-out = G['ROOT'] + '/학습자료_목록.tsv'
+out = G['ROOT'] + '/기록/학습자료_목록.tsv'
 with open(out, 'w', encoding='utf-8') as f:
     f.write('자료\t묶음\t책·작품\t학습 행\t시험 행\t비고\n')
     for r in ROWS: f.write('\t'.join(map(str, r)) + '\n')

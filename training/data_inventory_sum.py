@@ -10,12 +10,12 @@ def work(src, b):
     m = re.match(r'(?:목판본|필사본)_\d+_[^_]+_(.+?)(\d+)?(?:_\d+)?$', b)
     return m.group(1) if m else b
 agg = collections.OrderedDict()
-for r in csv.DictReader(open(ROOT + '/학습자료_목록.tsv', encoding='utf-8'), delimiter='\t'):
+for r in csv.DictReader(open(ROOT + '/기록/학습자료_목록.tsv', encoding='utf-8'), delimiter='\t'):
     k = (r['자료'], r['묶음'], work(r['자료'], r['책·작품']))
     a = agg.setdefault(k, {'권': 0, '학습': 0, '시험': 0, '비고': set()})
     a['권'] += 1; a['학습'] += int(r['학습 행']); a['시험'] += int(r['시험 행'])
     note = re.sub(r'정답 점검으로 \d+행 뺌 / ', '', r['비고']); a['비고'].add(note) if note else None
-with open(ROOT + '/학습자료_목록_작품별.csv', 'w', encoding='utf-8-sig', newline='') as f:
+with open(ROOT + '/기록/학습자료_목록_작품별.csv', 'w', encoding='utf-8-sig', newline='') as f:
     w = csv.writer(f); w.writerow(['자료', '묶음', '작품', '권·책 수', '학습 행', '시험 행', '비고'])
     for (s, g, n), a in agg.items(): w.writerow([s, g, n, a['권'], a['학습'], a['시험'], ' / '.join(sorted(a['비고']))])
-print('작품 줄', len(agg), '->', ROOT + '/학습자료_목록_작품별.csv')
+print('작품 줄', len(agg), '->', ROOT + '/기록/학습자료_목록_작품별.csv')

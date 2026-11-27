@@ -4,7 +4,7 @@
 import os, re, io, json, glob, zipfile, collections, requests
 from google.colab import userdata, drive
 drive.mount('/content/drive')
-ROOT = '/content/drive/MyDrive/방각본_판독기'; RAW = ROOT + '/private/kohico_raw'; os.makedirs(RAW, exist_ok=True)
+ROOT = '/content/drive/MyDrive/방각본_판독기'; RAW = ROOT + '/4_말뭉치_비공개/kohico_raw'; os.makedirs(RAW, exist_ok=True)
 API = 'https://kli.korean.go.kr/restapi/v1/corpus/download'
 for yr in ('2023', '2024', '2025'):
     dst = f'{RAW}/{yr}'; os.makedirs(dst, exist_ok=True)

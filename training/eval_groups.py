@@ -21,7 +21,7 @@ def counts(preds, gts):
 from rapidfuzz.distance import Levenshtein as Lv
 os.environ['BANGAKBON_NO_MAIN'] = '1'
 B = {'__name__': 'bulk'}; exec(requests.get(RAW + 'bulk_ocr.py', timeout=60).text, B)
-KPG = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KPG = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for kk, v in KPG.items() if kk.startswith('금향정기_2')][0]
@@ -51,7 +51,7 @@ def run(m):
     R[('방각본', '금향졍긔 권하(경판)')] = geum(m)
     return R
 OUT = {}
-for tag, path in (('v2', ROOT + '/svtrv2_model_v2.pt'), ('p1', ROOT + '/svtrv2_model_p1.pt')):
+for tag, path in (('v2', ROOT + '/1_모델/svtrv2_model_v2.pt'), ('p1', ROOT + '/1_모델/svtrv2_model_p1.pt')):
     svm.load_state_dict(torch.load(path, map_location=DEV, weights_only=False)['state']); OUT[tag] = run(svm)
     print(tag, '끝', flush=True)
 print('\n[언어 모델 보정 없이 글자 오류율]          v2(이전)     p1(지금 사이트)   글자 수')
@@ -64,5 +64,5 @@ for grp in ('방각본', '필사본'):
     E2 = sum(OUT['v2'][k][0] for k in keys); E1 = sum(OUT['p1'][k][0] for k in keys); N = sum(OUT['v2'][k][1] for k in keys)
     print(f' ▶ {grp:24s} {E2/N*100:7.2f}%   {E1/N*100:7.2f}%   {N:8d}')
     res[grp] = {'v2': E2 / N, 'p1': E1 / N, 'n': N, 'parts': {k[1]: {'v2': OUT['v2'][k][0] / OUT['v2'][k][1], 'p1': OUT['p1'][k][0] / OUT['p1'][k][1], 'n': OUT['v2'][k][1]} for k in keys}}
-json.dump(res, open(ROOT + '/result_groups_v2_p1.json', 'w'), ensure_ascii=False, indent=1)
-print('결과 파일:', ROOT + '/result_groups_v2_p1.json')
+json.dump(res, open(ROOT + '/기록/result_groups_v2_p1.json', 'w'), ensure_ascii=False, indent=1)
+print('결과 파일:', ROOT + '/기록/result_groups_v2_p1.json')

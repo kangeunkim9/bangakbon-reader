@@ -15,7 +15,7 @@ from PIL import Image, ImageOps
 from scipy.signal import find_peaks
 
 ROOT = os.environ.get('BANGAKBON_ROOT', '/content/drive/MyDrive/방각본_판독기')
-IN, OUT = ROOT + '/판독할_PDF', ROOT + '/판독결과'
+IN, OUT = ROOT + '/5_판독할_PDF', ROOT + '/6_판독결과'
 REPO = 'https://raw.githubusercontent.com/kangeunkim9/bangakbon-reader/main/'
 UA = {'User-Agent': 'KoreanWoodblockOCR/0.1 (https://kangeunkim9.github.io; academic research) python-requests'}
 H, MAXW = 64, 1600
@@ -133,7 +133,7 @@ class Reader:
 def newest_model():
     """드라이브에 학습한 모델(.pt)이 있으면 그것, 없으면 판독기에 올린 공개 모델(ONNX)을 GitHub에서 받는다."""
     for v in (9, 8, 7):
-        p = f'{ROOT}/gyeongpan_model_v{v}.pt'
+        p = f'{ROOT}/1_모델/gyeongpan_model_v{v}.pt'
         if os.path.exists(p): return p
     html = requests.get(REPO + 'web/index.html', timeout=60).text
     m = re.search(r"model: \[([^\]]+)\]", html); cs = re.search(r"charset: '([^']+)'", html)

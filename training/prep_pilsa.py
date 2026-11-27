@@ -4,7 +4,7 @@ import os, requests
 src = requests.get('https://raw.githubusercontent.com/kangeunkim9/bangakbon-reader/main/training/prep_aihub.py', timeout=60).text
 G_ = {'__name__': 'prep'}; exec(src, G_)
 from google.colab import drive; drive.mount('/content/drive')
-G_['SRC'] = '/content/drive/MyDrive/방각본_판독기/aihub_pilsa'
+G_['SRC'] = '/content/drive/MyDrive/방각본_판독기/3_AI허브_원본/aihub_pilsa'
 G_['WORK'] = '/content/pilsa'; G_['OUT'] = '/content/pilsa_lines'
 os.makedirs(G_['WORK'], exist_ok=True); os.makedirs(G_['OUT'], exist_ok=True)
 import glob, tarfile, shutil

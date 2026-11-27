@@ -2,7 +2,7 @@
 import os, re, io, glob, json, tarfile, zipfile, unicodedata, collections, shutil, time
 import numpy as np
 from PIL import Image
-SRC = '/content/drive/MyDrive/방각본_판독기/aihub'
+SRC = '/content/drive/MyDrive/방각본_판독기/3_AI허브_원본/aihub'
 WORK = '/content/aihub_work'; OUT = '/content/aihub_lines'
 os.makedirs(WORK, exist_ok=True); os.makedirs(OUT, exist_ok=True)
 dec = lambda s: re.sub(r'#U([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), s)

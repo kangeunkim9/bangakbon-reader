@@ -21,9 +21,9 @@ from strhub.models.parseq.system import PARSeq
 
 # ---------------- 1) NDL 체크포인트 받기 ----------------
 CKURL = 'https://lab.ndl.go.jp/dataset/ndlocr-lite/ver1.2_models/parseq-ndl-24x768-100-tiny-153epoch-tegaki3-r8data-202604.ckpt'
-NDLCK = ROOT + '/ndl/' + CKURL.rsplit('/', 1)[1]
+NDLCK = ROOT + '/1_모델/ndl/' + CKURL.rsplit('/', 1)[1]
 if not os.path.exists(NDLCK):
-    os.makedirs(ROOT + '/ndl', exist_ok=True)
+    os.makedirs(ROOT + '/1_모델/ndl', exist_ok=True)
     with requests.get(CKURL, stream=True, timeout=120) as r:
         r.raise_for_status()
         with open('/content/ndl.ckpt', 'wb') as f:
@@ -34,7 +34,7 @@ hp = dict(ck['hyper_parameters'])
 print('NDL 모델 설정:', {k: hp[k] for k in ('img_size', 'patch_size', 'embed_dim', 'enc_depth', 'dec_depth', 'max_label_length') if k in hp}, flush=True)
 
 # ---------------- 2) 글자표를 옛한글 자모로 바꾼 모델 ----------------
-CH = list(load_model(ROOT + '/gyeongpan_model_v10.pt', 'cpu')[1].chars)   # 10차와 같은 자모 222종
+CH = list(load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', 'cpu')[1].chars)   # 10차와 같은 자모 222종
 CHS = set(CH); CHARSET = ''.join(CH)
 IMG = list(hp['img_size']); MAXL = int(hp['max_label_length'])
 lab = lambda t: ''.join(c for c in nfd(t) if c in CHS)
@@ -100,7 +100,7 @@ pg = [{'params': [p for n, p in sysm.named_parameters() if n in NEW], 'lr': 1e-3
 opt = torch.optim.AdamW(pg, weight_decay=0.01)
 sch = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=[1e-3, 3e-4], total_steps=steps, pct_start=0.05)
 scaler = torch.cuda.amp.GradScaler()
-CKP = ROOT + '/ckpt_parseq.pt'; SAVEP = ROOT + '/parseq_model_v1.pt'; ep0 = 1; best = None; logp = []
+CKP = ROOT + '/1_모델/ckpt_parseq.pt'; SAVEP = ROOT + '/1_모델/parseq_model_v1.pt'; ep0 = 1; best = None; logp = []
 if os.path.exists(CKP):
     c0 = torch.load(CKP, map_location=DEV, weights_only=False)
     if c0.get('per') == per and c0.get('chars') == CHARSET:
@@ -128,7 +128,7 @@ for ep in range(ep0, EP + 1):
 
 # ---------------- 5) 시험: 10차와 나란히 ----------------
 sysm.load_state_dict(torch.load(SAVEP, map_location=DEV, weights_only=False)['state'])
-m10, cs10 = load_model(ROOT + '/gyeongpan_model_v10.pt', DEV)
+m10, cs10 = load_model(ROOT + '/1_모델/gyeongpan_model_v10.pt', DEV)
 R = {}
 R['val_v10'] = cer(predict(m10, cs10, [p for p, _ in KVA], DEV), [t for _, t in KVA]); R['pilsa_v10'] = cer(predict(m10, cs10, [p for p, _ in PSV], DEV), [t for _, t in PSV])
 R['val_p'], R['pilsa_p'] = val_p(sysm)
@@ -137,7 +137,7 @@ R['simcheong_v10'] = cer(predict(m10, cs10, [p for p, _ in sm], DEV), [t for _, 
 from rapidfuzz.distance import Levenshtein as Lv
 os.environ['BANGAKBON_NO_MAIN'] = '1'
 B = {'__name__': 'bulk'}; exec(requests.get(RAW + 'bulk_ocr.py', timeout=60).text, B)
-KPG = json.load(gzip.open(ROOT + '/private/kohico_pages.json.gz', 'rt', encoding='utf-8'))
+KPG = json.load(gzip.open(ROOT + '/4_말뭉치_비공개/kohico_pages.json.gz', 'rt', encoding='utf-8'))
 CL = re.compile(r'[ᄀ-ᅟꥠ-꥿]+[ᅠ-ᆧힰ-ퟆ]+[ᆨ-ᇿퟋ-ퟻ]*|.', re.S)
 toks = lambda s: CL.findall(unicodedata.normalize('NFC', s))
 GP = [v for k, v in KPG.items() if k.startswith('금향정기_2')][0]
@@ -156,11 +156,11 @@ def geum(read_face):
     for op in Lv.editops(flat, GT):
         p = min(op.src_pos, len(own_) - 1); err[own_[p] >= 36] += 1
     return err[True] / nn_[True]
-R10 = B['Reader'](ROOT + '/gyeongpan_model_v10.pt')
+R10 = B['Reader'](ROOT + '/1_모델/gyeongpan_model_v10.pt')
 R['geum_v10'] = geum(lambda crops: [s for s, _ in R10.read([B['prep_arr'](c) for c in crops], bs=1)])
 R['geum_p'] = geum(lambda crops: read_p(sysm, crops))
 print(f"\n[금향졍긔 뒤쪽 절반]  10차 {R['geum_v10']*100:.2f}%  PARSeq {R['geum_p']*100:.2f}%  (언어 모델 없이)")
 print(f"[경판 검증]          10차 {R['val_v10']*100:.2f}%  PARSeq {R['val_p']*100:.2f}%")
 print(f"[필사본 시험 행]      10차 {R['pilsa_v10']*100:.2f}%  PARSeq {R['pilsa_p']*100:.2f}%")
 print(f"[AI허브 심청전_04]   10차 {R['simcheong_v10']*100:.2f}%  PARSeq {R['simcheong_p']*100:.2f}%")
-json.dump({'result': R, 'log': logp, 'hp': {k: v for k, v in hp.items() if k not in ('charset_train', 'charset_test')}}, open(ROOT + '/result_parseq_v1.json', 'w'), ensure_ascii=False)
+json.dump({'result': R, 'log': logp, 'hp': {k: v for k, v in hp.items() if k not in ('charset_train', 'charset_test')}}, open(ROOT + '/기록/result_parseq_v1.json', 'w'), ensure_ascii=False)

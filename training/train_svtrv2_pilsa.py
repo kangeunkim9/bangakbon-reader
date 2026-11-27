@@ -65,7 +65,7 @@ else:
     json.dump(keep, open(FILT, 'w'))
     if os.path.exists(PART): os.remove(PART)
     print('정답 점검으로 뺀 비율이 높은 책:', sorted(((bad[b] / seen[b], seen[b], b) for b in seen if seen[b] >= 50), reverse=True)[:10], flush=True)
-# 8_검증용_작품에 들어 있는 작품은 학습에서 뺀다. 폴더 이름이 '작품명_소장처'든 '작품명_판종_소장처'든 맨 앞을 작품명으로 읽는다.
+# 8_검증용_작품에 들어 있는 작품은 학습에서 뺀다. 폴더 이름이 '12. 작품명_판종_소장처'처럼 번호가 붙어 있어도 번호를 떼고 맨 앞을 작품명으로 읽는다.
 # (정답 점검 결과 keep은 ALL의 순서에 묶여 있으므로 ALL은 그대로 두고 여기서 거른다)
 def _val_works():
     vd = [os.path.join(ROOT, d) for d in os.listdir(ROOT) if nfc(d).startswith('8_')]
@@ -73,7 +73,7 @@ def _val_works():
     for dp, dn, fn in (os.walk(vd[0]) if vd else []):
         if nfc(os.path.basename(dp)) == '원문': continue
         for d in dn:
-            if '_' in d: w.add(re.sub(r'\(.*?\)', '', nfc(d).split('_')[0]).strip())
+            if '_' in d: w.add(re.sub(r'\(.*?\)', '', re.sub(r'^\d+\.\s*', '', nfc(d)).split('_')[0]).strip())
     return w
 def _book_work(b):
     m = re.match(r'(?:필사본|목판본)_\d+_[^_]+_(.+?)(?:_\d+)?$', nfc(b))

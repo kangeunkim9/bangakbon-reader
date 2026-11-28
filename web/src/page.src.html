@@ -252,7 +252,7 @@ textarea.copybox{width:100%;height:120px;font:.85rem var(--f-old);border:1px sol
 
   <section class="bench" id="bench">
     <div class="panel">
-      <div class="ph"><h2 id="facsTitle">판본</h2><span class="sp"></span><small>틀을 누르면 그 행으로 갑니다</small></div>
+      <div class="ph"><h2 id="facsTitle">판본</h2><span class="sp"></span><small id="boxHint">틀을 누르면 그 행으로 갑니다</small><button type="button" id="boxBtn" aria-pressed="true" title="행을 어떻게 나눴는지 보여 주는 상자를 켜고 끕니다">행 상자 숨기기</button></div>
       <div class="facs" id="facs"></div>
     </div>
     <div class="panel" id="textPanel">
@@ -343,7 +343,9 @@ if (!CFG.lm) document.querySelectorAll('.lmonly').forEach(e=>{ e.hidden=true; })
 if (CFG.github){ document.querySelectorAll('.ghhide').forEach(e=>{ e.hidden=true; }); document.querySelectorAll('.ghonly').forEach(e=>{ e.hidden=false; }); }
 const SAMPLE = /*SAMPLE*/;
 const $ = (id)=>document.getElementById(id);
-const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, engs:{}, lmReady:null, kind:'bang' };
+const state = { name:'', fileKey:'', file:null, pages:[], cur:0, running:false, stop:false, vert:false, eng:null, engs:{}, lmReady:null, kind:'bang', showBox:true };
+// 행 상자 켜고 끄기: 행을 어떻게 나눴는지 사진 위에 상자로 보여 준다. 끄면 사진만 깨끗이 본다
+$('boxBtn').addEventListener('click',()=>{ state.showBox=!state.showBox; const b=$('boxBtn'); b.setAttribute('aria-pressed', String(state.showBox)); b.textContent = state.showBox ? '행 상자 숨기기' : '행 상자 보기'; $('facs').dataset.k=''; renderCurrent(); });
 const runLabel = ()=> (state.runKind==='pilsa' ? CFG.pilsa : CFG).modelLabel;
 const kindCfg = ()=> state.kind==='pilsa' ? CFG.pilsa : CFG;
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener('change',()=>{ state.kind=r.value; if (r.checked && r.value==='pilsa') $('lm').checked=false; }));
@@ -704,10 +706,13 @@ function renderCurrent(partial){
   if (!P){ facs.innerHTML='<div class="none">아직 판독한 면이 없습니다.</div>'; body.innerHTML=''; return; }
   const label = state.name ? `${state.name} · ${plab(P)}` : plab(P);
   $('facsTitle').textContent='판본 · '+plab(P); $('textTitle').textContent='판독문 · '+plab(P);
-  const hideBox = P.status==='nomatch' && !P.reveal;
+  const hideBox = !state.showBox || (P.status==='nomatch' && !P.reveal);
+  $('boxHint').textContent = !state.showBox ? '행 상자를 숨겼습니다' : P.cols.length ? `행 ${P.cols.length}개로 나눴습니다. 틀을 누르면 그 행으로 갑니다` : '나눈 행이 없습니다';
   if (!facs.dataset.k || facs.dataset.k!==P.url+'|'+P.cols.length+'|'+hideBox){
     facs.dataset.k=P.url+'|'+P.cols.length+'|'+hideBox;
-    const rects = (hideBox ? [] : P.cols).map(([a,c],k)=>`<rect class="c${k%2}" data-k="${k}" x="${a}" y="${P.t}" width="${c-a}" height="${P.bt-P.t}"/><text x="${(a+c)/2}" y="${Math.max(24,P.t-10)}">${k+1}</text>`).join('');
+    // 필사본 행 찾기 모델이 준 상자는 행마다 위아래가 다르므로(P.rows) 그대로 그린다
+    const rects = (hideBox ? [] : P.cols).map(([a,c],k)=>{ const [y0,y1]=(P.rows&&P.rows[k])||[P.t,P.bt];
+      return `<rect class="c${k%2}" data-k="${k}" x="${a}" y="${y0}" width="${c-a}" height="${y1-y0}"/><text x="${(a+c)/2}" y="${Math.max(24,y0-10)}">${k+1}</text>`; }).join('');
     facs.innerHTML=`<div class="stage"><img src="${P.url}" alt="${esc(label)} 사진" width="${P.W}" height="${P.H}"><svg viewBox="0 0 ${P.W} ${P.H}" preserveAspectRatio="none" role="img" aria-label="행 나눈 틀 ${P.cols.length}개">${rects}</svg></div>`;
     facs.querySelectorAll('rect').forEach(r=>r.addEventListener('click',()=>{ select(+r.dataset.k, true); }));
   }

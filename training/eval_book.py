@@ -78,7 +78,7 @@ def read_gt(files):
 junk = lambda s, c: c < 0.6 or len(B['G'](s)) <= 2 or (len(B['G'](s)) <= 3 and c < 0.9)
 def read_book(path, pilsa=False):
     split = B['split_spread_paper'] if pilsa else B['split_spread']
-    P = pages(path); LPS, FACE, t0 = [], [], time.time()
+    P = pages(path); LPS, FACE, FC, t0 = [], [], [], time.time()   # FC: 면마다 (이름, 상태, 나눈 행) - line_check.py가 읽는다
     for n, (pname, opener) in enumerate(P):
         try: g = opener()
         except Exception as e:
@@ -87,7 +87,9 @@ def read_book(path, pilsa=False):
             im = B['norm_width'](im)
             try: t, bt, cols = B['segment'](im)[:3]
             except Exception: cols = []
-            if len(cols) < 6: continue
+            lab = pname + (' ' + side if side else '')
+            if len(cols) < 6:
+                FC.append({'면': lab, '상태': 'empty', '행': []}); continue
             lps = []
             with torch.no_grad():
                 for a, c in cols:
@@ -106,11 +108,12 @@ def read_book(path, pilsa=False):
                 rm.add(k)
             keep = [k for k in range(nn) if k not in rm]
             lens = [len(B['G'](txt[k])) for k in keep]
-            if not keep or all(x < 3 for x in lens[:6]) or float(np.median(lens)) < 8 or np.mean(conf) < 0.55: continue   # 표지·빈 면
-            lab = pname + (' ' + side if side else '')
+            if not keep or all(x < 3 for x in lens[:6]) or float(np.median(lens)) < 8 or np.mean(conf) < 0.55:   # 표지·빈 면
+                FC.append({'면': lab, '상태': 'nomatch', '행': [list(map(int, c)) for c in cols]}); continue
+            FC.append({'면': lab, '상태': 'ok', '행': [list(map(int, cols[k])) for k in keep]})
             for k in keep: LPS.append(lps[k]); FACE.append(lab)
         if (n + 1) % 10 == 0: print(f'  {n + 1}/{len(P)}면 읽음 ({time.time() - t0:.0f}초)', flush=True)
-    return P, LPS, FACE
+    return P, LPS, FACE, FC
 
 
 def score(texts, GT):
@@ -128,7 +131,7 @@ def eval_one(path, gt_files, name, pilsa=False, outdir=None):
     outdir = outdir or ROOT + '/기록'
     os.makedirs(outdir, exist_ok=True)
     t0 = time.time()
-    P, LPS, FACE = read_book(path, pilsa)
+    P, LPS, FACE, FC = read_book(path, pilsa)
     print(f'[{name}] 원문 {len(P)}면 중 글자 있는 면 {len(set(FACE))}, 행 {len(LPS)}', flush=True)
     gt = read_gt(gt_files); GT = toks(gt)
     print(f'[{name}] 정답 글자 {len(GT)} / 정답에 반복 부호(〃) {gt.count("〃")}', flush=True)
@@ -140,7 +143,7 @@ def eval_one(path, gt_files, name, pilsa=False, outdir=None):
         RES[nm] = {'CER': round(e, 2), '판독 글자': n, '정답 글자': len(GT), '종류': kinds, '자주 틀린 것': [[a, b, k] for (a, b), k in top]}
         print(f'[{name}] {nm}: 글자 오류율 {e:.2f}%  (판독 {n}자 / 정답 {len(GT)}자, 바꿈 {kinds.get("replace", 0)} 뺌 {kinds.get("delete", 0)} 빠뜨림 {kinds.get("insert", 0)})')
         print('  자주 틀린 것(판독→정답):', ', '.join(f'{a}→{b} {k}' for (a, b), k in top[:15]), flush=True)
-    RES['걸린 초'] = round(time.time() - t0)
+    RES['걸린 초'] = round(time.time() - t0); RES['면별 행'] = FC
     safe = re.sub(r'[\\/:*?"<>|]', '_', name)
     json.dump(RES, open(f'{outdir}/{safe}.json', 'w'), ensure_ascii=False, indent=1)
     with open(f'{outdir}/{safe}_판독문.txt', 'w', encoding='utf-8') as f:
